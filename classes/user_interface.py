@@ -294,7 +294,7 @@ class User_Interface:
                         position, vitesse, lacet, V, gaz, F_com, varbre, vold):
         """Met à jour l'affichage de télémesure"""
         # Télémesure 1
-        texteaff = (f"N= {pas_simul:10}  T = {temps:6.2f}  Tcyclemax = {int(t_cyclemax*1000):5d} "
+        texteaff = (f"N= {pas_simul:10}  T = {temps:6.2f}  Tcyclemax = {int(t_cyclemax*1000):3d} ms "
                    f"F_com = {len(F_com):5d}  X = {position[0]:6.2f}   Y = {position[1]:6.2f}   Z = {position[2]:6.2f} "
                    f"Vx = {vitesse[0]:6.2f}  Vy = {vitesse[1]:6.2f}   Lacet = {lacet*180./np.pi:6.2f} "
                    f"V =  {V:6.2f} m/s =  {V*3.6:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f}")

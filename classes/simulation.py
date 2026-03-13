@@ -21,7 +21,7 @@ class SimulationCore:
         self.temps = 0.0
         self.pas_simul = 0
         self.pas_com = 0
-        self.force_cdg = np.array([0., 0., 0.])
+        self.force_cdg = np.array([0., 0., 0.])     #  A QUOI SERT CET ATTIRBUT DANS SIMULATION ?? 
         self.moment_cdg = np.array([0., 0., 0.])
         self.kart.init_state()
     
@@ -385,7 +385,7 @@ class SimulationUI(User_Interface):
         
         # Calcul du temps de cycle
         t_cycle = time.time() - start
-        if self.temps.get() > 1.:
+        if state['temps'] > 1.:
             self.t_cyclemax = max(t_cycle, self.t_cyclemax)
         
         # Programmation de la prochaine étape

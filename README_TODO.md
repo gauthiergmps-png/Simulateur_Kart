@@ -14,7 +14,7 @@
 - V0.12 je passe en cursor...et je passe en classe la roue et le kart
 - V0.13: Je passe en classe aussi la simulation et l'interface utilisateur.
 
-- V1.0 - Mars 2026 - restructuration pour compatibilité RL: séparation Classes SimulationCore, SimulationUI, Kart, Mobile suivant le fichier STRUCTURE_TARGET et Main_simul_manuelle.py pour faire ce que je faisai jusqu'à présent avec ce programme.
+- V1.0 - Mars 2026 - restructuration pour compatibilité RL: séparation Classes SimulationCore, SimulationUI, Kart, Mobile suivant le fichier STRUCTURE_TARGET et Main_simul_manuelle.py pour faire ce que je faisai jusqu'à présent avec ce programme, et je crée un dépot distant Simulateur_Kart dans Github, maisje laisse le dépot local dans mon dossier Python dropbox, on verra bien.
 
 
 # TODO
