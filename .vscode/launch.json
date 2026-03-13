@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: main_V0.13.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_V0.13.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${command:python.interpreterPath}"
+        }
+    ]
+}
