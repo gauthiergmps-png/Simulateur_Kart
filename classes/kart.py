@@ -15,49 +15,52 @@ class Mobile():
 
     def __init__(self, masse=450, inertie_lacet=1000):
         """ Initialise un nouveau mobile avec ses paramètres dynamiques"""
-        # Variables statiques: Masse, poids et inertie
+        # Variables statiques: Masse, poids et inertie:
         self.masse = masse             # Masse mobile en Kg
         self.inertie_lacet = inertie_lacet  # inertie en Lacet, Kgm²
         self.init_state()
 
-    def init_state(self):
+    def init_state(self, position=np.array([0., 0., 0.]), vitesse=np.array([0., 0., 0.]), 
+                         angles=np.array([0., 0., 0.]), vitangul=np.array([0., 0., 0.])):
         # Variables dynamiques: positions, vitesses, angles et vitesses angulaires, vecteurs 3D
-        self.position = np.array([0., 0., 0.])  # vecteur position du cdg en repère piste
-        self.vitesse = np.array([0., 0., 0.])   # vecteur vitesse en repère mobile
-        self.angles = np.array([0., 0., 0.])    # angles de Bryant (phi(z), teta(y), psi(x))
-        self.vitangul = np.array([0., 0., 0.])  # vitesses angulaires en rd/s
+        self.position = position  # vecteur position du cdg en repère piste
+        self.vitesse = vitesse    # vecteur vitesse en repère véhicule, donc attention, il faut le détourner d'un cran !
+        self.angles = angles      # angles de Bryant (phi(z), teta(y), psi(x))
+        self.vitangul = vitangul  # les vitesses angulaires en rd/s, attention, omega = np.flip(vitangul)
 
         # Variables des forces et moments
         self.force_cdg = np.array([0., 0., 0.])   # force appliquée au cdg en repère absolu
         self.moment_cdg = np.array([0., 0., 0.])  # moment appliqué au cdg en repère absolu
 
-    def update_position(self, dt):
-        """ Met à jour la position absolue du mobile en fonction de sa vitesse qui est en repère mobile """
+    def _update_dynamique(self, dt):
+        """ Propage la dynamique du mobile en fonction de la force appliquée au cdg et du moment appliqué au cdg """
+        
+        # Propage la position absolue du mobile en fonction de sa vitesse qui est en repère mobile 
         self.position = self.position + vehicule2piste(self.vitesse, self.angles[0]) * dt
-    
-    def update_angles(self, dt):
-        """ Met à jour les positions angulaires du mobile (angles de Bryant) en fonction des vitesses angulaires """
+
+        # Propage les positions angulaires du mobile (angles de Bryant, soit phi(z), teta(y), psi(x)),
+        # en fonction de ses vitesses angulaires qui sont en rd/s """
         self.angles = self.angles + self.vitangul * dt
 
-    def update_vitesse(self, dt):
-        """ Met à jour la vitesse du mobile (en repère mobile) en fonction de la force appliquée au cdg """
+        # propage la vitesse du mobile (en repère véhicule) en fonction de la force appliquée au cdg
         Omeg_cdg = np.flip(self.vitangul)
         self.vitesse = (self.vitesse
                         + piste2vehicule(self.force_cdg/self.masse, self.angles[0]) * dt
-                        + np.cross(self.vitesse, Omeg_cdg) * dt)
+                        + np.cross(self.vitesse, Omeg_cdg) * dt)  # détourne le vecteur vitesse pour le mettre en repère véhicule
 
-    def update_vitangul(self, dt):
-        """ Met à jour les vitesses angulaires du mobile en fonction du moment appliqué au cdg """
-        # 2D: seul moment de lacet pris en compte
+        # Propage les vitesses angulaires du mobile en fonction du moment Z appliqués au cdg
+        # idem rotations pour l'instant en 2D, seul moment lacet: dérivée lacet = vlacet, et dérivée vlacet = moment / inertie
+        # il faudra remettre moment_cdg dans le bon ordre d'ailleurs !
         self.vitangul = self.vitangul + np.array([self.moment_cdg[2]/self.inertie_lacet,0.,0.]) * dt
 
-    def update_force_et_moment_cdg(self, forces_elements):
+    def _update_force_et_moment_cdg(self, forces_elements):
         """Calcule les forces et moments appliquées au cdg en repère absolu
-        à partir de forces élémentaires appliquées en certains points du mobile.
+        à partir de forces élémentaires appliquées en certains points du mobile et définie par le dictionnaire suivant:
+        forces_elements = { (point_application, force_elementaire) }
+        où point_application [Float, Float, Float] avec coordonnées en repère mobile
+        et force élémentaire [Float, Float, Float] un vecteur 3D en newtons donnée en repère du mobile.
 
-        forces_elements: dict { point_application: force_elementaire }
-          - point_application: np.array([x,y,z]) en repère mobile
-          - force_elementaire: np.array([Fx,Fy,Fz]) en repère mobile
+        et calcule self.force_cdg en repère absolu, et self.moment_cdg en repère mobile, égal au repère absolu en 2D.
         """
         force_cdg = np.array([0., 0., 0.])
         moment_cdg = np.array([0., 0., 0.])
@@ -71,15 +74,21 @@ class Mobile():
         force_cdg = vehicule2piste(force_cdg, self.angles[0]) + np.array([0.,0.,self.masse*9.81 ])
         if (abs(force_cdg[2])>1e-5): print("Problème, le mobile a une force Z !", force_cdg[2])  # on vérifie qu'il s'envole pas
 
-        # Ajout éventuel de force_aero en repère mobile - à venir
+        # Ajout force_aero = -Cx * V², en repère véhicule - A VENIR
         self.force_cdg = force_cdg
         self.moment_cdg = moment_cdg
-
 
 class Kart(Mobile):
     """Classe représentant un kart héritant d'une classe "Mobile" qui a les variables dynamiques
 
-    # les methodes "update_" ont vocation à être appelées par la simulation
+    Les methodes suivantes ont vocation à être appelées par la simulation:
+    - init_state()
+    - update_parametres(h_cdg, ouverture, transm)  si on veut changer des paramètres sans reset
+    - update_state(dt, volant, gaz, frein) pour propager l'état du kart à partir des contrôles
+
+    Et pour un affichage:    
+    - profil_absolu() - retourne le profil du kart en repère absolu pour affichage
+
     """
 
     def __init__(self, empattement=2.0 , pos_cdg=0.4 , voie_av=0.8 , voie_ar=1.2 ):
@@ -108,10 +117,17 @@ class Kart(Mobile):
         self.roue_arg = Wheel("ARG", self)
         self.roue_ard = Wheel("ARD", self)
 
-    def init_state(self):
-
-        # appel au constructeur de Mobile pour l'initialisation des variables dynamiques
-        super().init_state()
+    def init_state(self, position=None, vitesse=None, angles=None, vitangul=None):
+        # Arguments optionnels comme dans Mobile.init_state (ligne 23) ; None = valeur par défaut
+        if position is None:
+            position = np.array([0., 0., 0.])
+        if vitesse is None:
+            vitesse = np.array([0., 0., 0.])
+        if angles is None:
+            angles = np.array([0., 0., 0.])
+        if vitangul is None:
+            vitangul = np.array([0., 0., 0.])
+        super().init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
 
         # Variables des contrôles et réglages
         self.transm=0        # Transmission: 0: roues independantes propulsion, 1: pont arrière rigide, 2: 4 Wheels intégral
@@ -138,7 +154,7 @@ class Kart(Mobile):
         self.gard = 0 # glissement de la roue arrière droite
 
     @property   
-    def profil(self):    
+    def _profil(self):    
         """Retourne la liste des vecteurs necessaires au tracé du kart en repère véhicule"""
         # D'abord les quatres vecteurs position des angles chassis """
         # premier point = coin ARD près de la roue, deuxième en arg, puis avg puis avd
@@ -156,19 +172,27 @@ class Kart(Mobile):
     def profil_absolu(self):
         """Retourne un profil complet x,y à plotter du véhicule"""
         # on tourne la voiture de l'angle lacet, puis on la place à sa position
-        X = vehicule2piste(self.profil, self.angles[0]) + np.array([self.position[0], self.position[1], 0.])
+        X = vehicule2piste(self._profil, self.angles[0]) + np.array([self.position[0], self.position[1], 0.])
         return list(X[:, 0]), list(X[:, 1]) # x,y du profil du kart en repère absolu
 
-    def update_controles(self, h_cdg, volant, gaz, frein, ouverture, transm):
-        """ Met à jour les contrôles du kart """
+    def update_parametres(self, h_cdg, ouverture, transm):
+        """ Met à jour les paramètres du kart
+            indépendant du reset, car on peut ainsi modifier les paramètres sans reset pendant une simulation 
+            en mode interactif
+        """
+
         self.h_cdg = h_cdg
+        self.transm = transm
+        self.ouverture = ouverture
+    
+    def _update_controles(self, volant, gaz, frein):
+        """ Met à jour les contrôles du kart """
         self.puis_mot = 735.5 * gaz    # gaz recu en ch, on passe ici en puissance motrice en watt
         self.frein = frein
-        self.transm = transm
         """ calcul des angles de braquage roues avant G et D en repère véhicule en radians
             à partir des commandes angle volant et réglage d'ouverture en deg """
         braquage=np.radians(volant)
-        ouv=np.radians(ouverture)
+        ouv=np.radians(self.ouverture)
         if (abs(braquage)>1e-10):
             R=self.empattement/np.tan(braquage)
             self.tetag =np.arctan(self.empattement/(R-self.roue_avg.position[1]))-ouv
@@ -333,7 +357,7 @@ class Kart(Mobile):
         self.farg, self.garg = self.roue_arg.force()
         self.fard, self.gard = self.roue_ard.force()
 
-    def update_force_et_moment_cdg(self):
+    def _update_force_et_moment_cdg(self):
         """Calcule les forces et moments appliquées au cdg du Kart en repère absolu à partir des forces roues.
         Cette méthode spécialise update_force_et_moment_cdg de la classe Mobile.
         
@@ -352,79 +376,18 @@ class Kart(Mobile):
             tuple(self.roue_ard.position): self.fard,
         }
         # appel à la méthode générique de Mobile qui met à jour self.force_cdg et self.moment_cdg
-        super().update_force_et_moment_cdg(forces_elements)
+        super()._update_force_et_moment_cdg(forces_elements)
 
+    def update_state(self, dt, volant, gaz, frein):
+        """ Seule méthode à appeler par une simulation pour propager l'état du kart
+         sur un pas de temps dt en fonction des contrôles
+         """
 
-class Mobile():
-    """Classe parente de la classe Kart, représentant un mobile avec ses propriétés physiques,
-    statiques et dynamiques. Le repère mobile est un repère de véhicule (angles de Bryant)."""
+        # Application des contrôles
+        self._update_controles(volant, gaz, frein)
 
-    # les methodes "update_" ont vocation à être appelées par la simulation
+        # Propagation de la dynamique
+        self._update_dynamique(dt)
 
-    def __init__(self, masse=450, inertie_lacet=1000):
-        """ Initialise un nouveau mobile avec ses paramètres dynamiques"""
-          
-        # Variables statiques: Masse, poids et inertie: 
-        self.masse=masse             # Masse mobile en Kg
-        
-        self.inertie_lacet = inertie_lacet  # inertie en Lacet, Kgm²
-        self.init_state()
-
-    def init_state(self):
-        # Variables dynamiques: positions, vitesses, angles et vitesses angulaires, vecteure 3D
-        self.position = np.array([0., 0., 0.])  # vecteur position du cdg en repère piste
-        self.vitesse = np.array([0., 0., 0.])   # vecteur vitesse en repère véhicule, donc attention, il faut le détourner d'un cran !
-        self.angles = np.array([0., 0., 0.]) # angles de Bryant (phi(z), teta(y), psi(x))
-        self.vitangul = np.array([0., 0., 0.])   # les vitesses angulaires en rd/s, attention, omega = np.flip(vitangul)
-
-        # Variables des forces et moments
-        self.force_cdg = np.array([0., 0., 0.]) # force appliquée au cdg en repère absolu
-        self.moment_cdg = np.array([0., 0., 0.]) # moment appliqué au cdg en repère absolu
-
-    
-    def update_position(self, dt):
-        """ Met à jour la position absolue du mobile en fonction de sa vitesse qui est en repère mobile """
-        self.position = self.position + vehicule2piste(self.vitesse, self.angles[0]) * dt
-    
-    def update_angles(self, dt):
-        """ Met à jour les positions angulaires du mobile ( angles de Bryant, soit phi(z), teta(y), psi(x)) ,
-           en fonction de ses vitesses angulaires qui sont en rd/s """
-        self.angles = self.angles + self.vitangul * dt
-
-    def update_vitesse(self, dt):
-        """ Met à jour la vitesse du mobile (en repère véhicule)en fonction de la force appliquée au cdg """
-        Omeg_cdg = np.flip(self.vitangul)
-        self.vitesse = self.vitesse +  +piste2vehicule(self.force_cdg/self.masse, self.angles[0]) * dt \
-        + np.cross(self.vitesse, Omeg_cdg) * dt # détourne le vecteur vitesse pour le mettre en repère véhicule
-
-    def update_vitangul(self, dt):
-        """ Met à jour les vitesses angulaires du mobile en fonction du moment Z appliqués au cdg """
-        # idem rotations pour l'instant en 2D, seul moment lacet: dérivée lacet = vlacet, et dérivée vlacet = moment / inertie
-        # il faudra remettre moment_cdg dans le bon ordre d'ailleurs !
-        self.vitangul = self.vitangul + np.array([self.moment_cdg[2]/self.inertie_lacet,0.,0.]) * dt
-
-    def update_force_et_moment_cdg(self, forces_elements):
-        """Calcule les forces et moments appliquées au cdg en repère absolu
-        a partir de forces élémentaires appliquées en certains points du mobile et définie par le dictionnaire suivant:
-        forces_elements = { (point_application, force_elementaire) }
-        où point_application [Float, Float, Float] avec coordonnées en repère mobile 
-        et force élémentaire [Float, Float, Float] un vecteur 3D en newtons donnée en repère du mobile 
-
-        et calcule self.force_cdg en repère absolu, et self.moment_cdg en repère mobile , égal au repère absolu en 2D.          
-        
-        """
-        force_cdg = np.array([0., 0., 0.])
-        moment_cdg = np.array([0., 0., 0.])
-
-        # calcul des forces et moments résultants des forces élémentaires au cdg du mobile, en repère mobile
-        for point_application, force_elementaire in forces_elements.items():
-            force_cdg += force_elementaire
-            moment_cdg += np.cross(point_application, force_elementaire)
-
-        # forces ramenées en repère piste, puis ajout de la force de gravité dans ce repère:
-        force_cdg=vehicule2piste(force_cdg, self.angles[0]) + np.array([0.,0.,self.masse*9.81 ])
-        if (abs(force_cdg[2])>1e-5): print("Problème, le mobile a une force Z !", force_cdg[2])  # on vérifie qu'il s'envole pas
-
-                # Ajout force_aero= -Cx * V²,  en repère véhicule - A VENIR
-        self.force_cdg = force_cdg
-        self.moment_cdg = moment_cdg
+        # Calcul des forces et moments appliqués au cdg dans le nouvel état
+        self._update_force_et_moment_cdg()

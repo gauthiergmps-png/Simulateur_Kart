@@ -3,7 +3,6 @@ Simulateur de Kart - Version Refactorisée
 Utilise les classes UI et Simulation pour une meilleure organisation du code
 """
 
-import numpy as np
 from classes.kart import Kart
 from classes.simulation import SimulationUI
 

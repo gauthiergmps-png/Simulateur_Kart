@@ -19,7 +19,9 @@
 
 # TODO
 
-faire la classe "mobile" pour gérer l'état dynamique, dont la classe Kart hérite. Voir le chat "héritage de la classe simulation"
+Clarifier condition de démarrage de record, juste après un reset serait mieux
+
+tracer un circuit faisable
 
 Supprimer l'asservissement vitesse lacet
 

@@ -40,9 +40,7 @@ class User_Interface:
         self.F_com = []
         self.Vold = 0.
         self.t_cyclemax = 0.
-                
-        # Variable dtold pour la fonction pause (sera surchargée par Simulation)
-        self.dtold = 25
+        self.simul_pause=True
         
         # Variables de caméra
         self.xcam = 0.
@@ -75,23 +73,13 @@ class User_Interface:
         self.ass_d = IntVar()
         self.transm = IntVar()
         
-        # Variables de simulation
-        self.pas_simul = IntVar()
-        self.temps = DoubleVar()
-        self.pas_com = IntVar()
-        
-        # Initialisation des valeurs
-        self.pas_simul.set(0)
-        self.temps.set(0.0)
-        self.pas_com.set(0)
-        
         # Bandeau principal
         bandeau = Frame(self.fenetre, width=1800, height=100, highlightbackground="red", highlightthickness=2)
         bandeau.pack()
         
         # Création des frames
         frames = {}
-        frame_names = ['frameB', 'frameA', 'frame0', 'frame1', 'frame2', 
+        frame_names = ['frameB', 'frameA', 'frame0', 'frame1', 'frame2B', 'frame2', 
                       'frame3', 'frame4', 'frame5', 'frame6', 'frame7', 'frame8']
         
         for i, name in enumerate(frame_names):
@@ -113,6 +101,9 @@ class User_Interface:
         
         # Frame 2 - Boutons RESET, PAUSE, QUIT
         self._create_control_buttons_frame(frames['frame2'])
+        
+        # Frame 2B - Boutons RECORD, STOP, REPLAY
+        self._create_recorder_buttons_frame(frames['frame2B'])
         
         # Frame 3 - Volant et hauteur CdG
         self._create_steering_frame(frames['frame3'])
@@ -180,6 +171,13 @@ class User_Interface:
         Button(frame, text="RESET", fg="green", command=self._handle_reset).pack(padx=10, pady=5, anchor=N)
         Button(frame, text="PAUSE", fg="blue", command=self._handle_pause).pack(padx=10, pady=5, anchor=CENTER)
         Button(frame, text="QUIT", fg="red", command=self.fenetre.destroy).pack(padx=10, pady=5, anchor=S)
+
+    def _create_recorder_buttons_frame(self, frame):
+        """Crée le frame des boutons du recorder"""
+        self.btn_record = Button(frame, text="RECORD", fg="green", command=self._handle_record)
+        self.btn_record.pack(padx=10, pady=5, anchor=N)
+        Button(frame, text="STOP", fg="blue", command=self._handle_stop).pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="REPLAY", fg="red", command=self._handle_replay).pack(padx=10, pady=5, anchor=S)
     
     def _create_steering_frame(self, frame):
         """Crée le frame de contrôle du volant et hauteur CdG"""
@@ -271,31 +269,39 @@ class User_Interface:
         self.reset()
     
     def _handle_pause(self):
-        """Gère l'action de pause - appelle la méthode surchargée"""
-        self.pause()
+        """Met en pause la simulation"""
+        self.simul_pause = not self.simul_pause
+
+    def _handle_record(self):
+        """Change le status de self.record_status et du bouton RECORD
+           et la classe fille SimulationUI gérera l'enregistrement
+        """
+        
+        self.record_status = True
+        self.btn_record.config(text="RECORDING", state="disabled")
+
+    def _handle_stop(self):
+        """Change le status de self.record_status et du bouton RECORD
+        """
+        self.record_status = False
+        self.btn_record.config(text="RECORD")  # reste disabled jusqu'au prochain reset
     
+    def _handle_replay(self):
+        """Gère l'action de pause - appelle la méthode surchargée"""
+        self.record_replay()
+
     @abstractmethod
     def reset(self):
         """Remet à zéro la simulation"""
         # Cette méthode doit être surchargée par la classe qui utilise UI
         pass
     
-    def pause(self):
-        """Met en pause la simulation"""
-        current_value = self.pas_de_temps.get()
-        
-        if current_value > 0:  # Si la simulation tourne
-            self.dtold = current_value  # Sauvegarde la valeur actuelle
-            self.pas_de_temps.set(0)    # Met en pause
-        else:  # Si la simulation est en pause
-            self.pas_de_temps.set(self.dtold)  # Reprend avec la valeur sauvegardée
-    
-    def update_telemetry(self, pas_simul, temps, t_cyclemax, force_cdg, moment_cdg, 
+    def update_telemetry(self, pas_simul, temps, t_cyclemax, t_framemax, force_cdg, moment_cdg, 
                         position, vitesse, lacet, V, gaz, F_com, varbre, vold):
         """Met à jour l'affichage de télémesure"""
         # Télémesure 1
-        texteaff = (f"N= {pas_simul:10}  T = {temps:6.2f}  Tcyclemax = {int(t_cyclemax*1000):3d} ms "
-                   f"F_com = {len(F_com):5d}  X = {position[0]:6.2f}   Y = {position[1]:6.2f}   Z = {position[2]:6.2f} "
+        texteaff = (f"N= {pas_simul:10}  T = {temps:6.2f}  Tcyclemax = {int(t_cyclemax*1000):3d} ms Tframemax = {int(t_framemax*1000):3d} ms "
+                   f"F_com = {F_com:5d}  X = {position[0]:6.2f}   Y = {position[1]:6.2f}   Z = {position[2]:6.2f} "
                    f"Vx = {vitesse[0]:6.2f}  Vy = {vitesse[1]:6.2f}   Lacet = {lacet*180./np.pi:6.2f} "
                    f"V =  {V:6.2f} m/s =  {V*3.6:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f}")
         self.telemesure1.config(text=str(texteaff))
