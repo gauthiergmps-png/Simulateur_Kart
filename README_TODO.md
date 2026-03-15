@@ -19,7 +19,7 @@
 
 # TODO
 
-Clarifier condition de démarrage de record, juste après un reset serait mieux
+voir l'état du epsilon quand je relance un Qlearning
 
 tracer un circuit faisable
 

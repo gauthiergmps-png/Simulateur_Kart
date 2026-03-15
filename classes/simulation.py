@@ -1,5 +1,10 @@
+import json
 import numpy as np
 import time
+from pathlib import Path
+
+RECORDS_DIR = Path(__file__).resolve().parent.parent / "Records"
+
 try:
     from .user_interface import User_Interface
     from .utils import vehicule2piste, norme_vecteur
@@ -359,10 +364,35 @@ class SimulationUI(User_Interface):
             self.btn_record.config(text="RECORDING", state="disabled")
  
     def record_replay(self):
-        """Reproduit l'enregistrement"""
+        """Action sur le bouton REPLAY: R
+             Soit on a fait un enregistrement temps réel, stocké dans self.controls_recorded, 
+             Soit on reproduit un fichier de commandes, à lire dans Records/commandes.txt, """
         self.record_status = False
         self.replay_status = True  # avant reset() pour que reset() ne vide pas controls_recorded
+
+        if self.controls_recorded:
+            pass
+        else:
+            with open(RECORDS_DIR / "commandes.txt", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # Format JSON: contient les conditions initiales et les commandes sous la forme:
+                # {"parametres": {position, vitesse, angles, vitangul?, ...}, "steps": [...]} 
+                # ou  un step est un dictionnaire: {"volant": x, "gaz": y, "frein": z}
+                self.controls_recorded = data["steps"]
+                self._replay_parametres = data.get("parametres", {})
+
         self.reset()
+
+        # Initialiser le kart selon parametres du fichier (état initial enregistré)
+        p = getattr(self, "_replay_parametres", None)
+        if p:
+            position = np.array(p["position"]) if "position" in p else None
+            vitesse = np.array(p["vitesse"]) if "vitesse" in p else None
+            angles = np.array(p["angles"]) if "angles" in p else None
+            vitangul = np.array(p["vitangul"]) if "vitangul" in p else None
+            if position is not None or vitesse is not None or angles is not None or vitangul is not None:
+                self.kart.init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
+            self._replay_parametres = None
     
     def animation_step(self):
         """Effectue une étape d'animation (UI + core)
@@ -413,7 +443,6 @@ class SimulationUI(User_Interface):
 
             # Propagation de l'état du kart par application des contrôles
             state = self.core.step(dt, kart_controls, simu_controls = simu_controls, kart_parametres = kart_parametres)
-
 
             if self.core.temps > 1.:
                 t_cycle = time.time() - t0_cycle # temps du step physique uniquement 
