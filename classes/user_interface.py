@@ -177,8 +177,10 @@ class User_Interface:
         self.btn_record = Button(frame, text="RECORD", fg="green", command=self._handle_record)
         self.btn_record.pack(padx=10, pady=5, anchor=N)
         Button(frame, text="STOP", fg="blue", command=self._handle_stop).pack(padx=10, pady=5, anchor=CENTER)
-        Button(frame, text="REPLAY", fg="red", command=self._handle_replay).pack(padx=10, pady=5, anchor=S)
-    
+        self.btn_replay = Button(frame, text="REPLAY", fg="red", command=self._handle_replay, state="disabled")
+        self.btn_replay.pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="READ", fg="black", command=self.read_commands).pack(padx=10, pady=5, anchor=CENTER)
+        
     def _create_steering_frame(self, frame):
         """Crée le frame de contrôle du volant et hauteur CdG"""
         self.volant_curseur = Scale(frame, from_=-45, to=45, length=200, 
@@ -294,6 +296,11 @@ class User_Interface:
     def reset(self):
         """Remet à zéro la simulation"""
         # Cette méthode doit être surchargée par la classe qui utilise UI
+        pass
+
+    @abstractmethod
+    def read_commands(self):
+        """Lit un fichier de commandes et remplit self.controls_recorded (et éventuels paramètres associés)."""
         pass
     
     def update_telemetry(self, pas_simul, temps, t_cyclemax, t_framemax, force_cdg, moment_cdg, 

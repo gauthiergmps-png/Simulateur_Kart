@@ -1,0 +1,301 @@
+{
+  "conditions_t0": {
+    "position": [
+      0.0,
+      0.1,
+      0.0
+    ],
+    "vitesse": [
+      10.0,
+      0.0,
+      0.0
+    ],
+    "angles": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "vitangul": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "parametres": {
+    "h_cdg": 0.0,
+    "ouverture": 0.0,
+    "transm": 0
+  },
+  "steps": [
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 0,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -5,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": 10,
+      "gaz": 0,
+      "frein": 0
+    },
+    {
+      "volant": -10,
+      "gaz": 0,
+      "frein": 0
+    }
+  ]
+}

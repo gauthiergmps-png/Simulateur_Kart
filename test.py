@@ -1,5 +1,3 @@
 import numpy as np
-a=np.linspace(-2, 2, 10)
-print(a, type(a))
-
-
+a= np.linspace(-1, 1, 9)
+print("a=", a)

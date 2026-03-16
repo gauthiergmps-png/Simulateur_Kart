@@ -2,6 +2,10 @@ import json
 import numpy as np
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .kart import Kart
 
 RECORDS_DIR = Path(__file__).resolve().parent.parent / "Records"
 
@@ -20,8 +24,9 @@ class SimulationCore:
        et propage l'état du kart.
        Pour l'instant on va se servir dans les variables de l'instance Kart pour les observables qu'on veut, à fignoler
     """
-    
-    def __init__(self, kart):
+    kart: "Kart"
+
+    def __init__(self, kart: "Kart"):
         self.kart = kart
         self.debug = False
         self.reset()
@@ -94,8 +99,9 @@ class SimulationCore:
 
 class SimulationUI(User_Interface):
     """Classe gérant la simulation manuelle avec interfaces utilisateurs Via Tkinter."""
-    
-    def __init__(self, kart):
+    kart: "Kart"
+
+    def __init__(self, kart: "Kart"):
         """Initialise le gestionnaire de simulation avec UI."""
         super().__init__(kart)
 
@@ -361,30 +367,58 @@ class SimulationUI(User_Interface):
         """
         if self.core.pas_simul == 0:        
             self.record_status = True
+            # On commence un nouvel enregistrement :
+            # - on vide les commandes précédentes
+            # - on oublie d'éventuelles conditions initiales provenant d'un fichier de replay
+            self.controls_recorded = []
+            self.cond_t0_recorded = None
             self.btn_record.config(text="RECORDING", state="disabled")
  
-    def record_replay(self):
-        """Action sur le bouton REPLAY: R
-             Soit on a fait un enregistrement temps réel, stocké dans self.controls_recorded, 
-             Soit on reproduit un fichier de commandes, à lire dans Records/commandes.txt, """
-        self.record_status = False
-        self.replay_status = True  # avant reset() pour que reset() ne vide pas controls_recorded
-
-        if self.controls_recorded:
-            pass
-        else:
-            with open(RECORDS_DIR / "commandes.txt", "r", encoding="utf-8") as f:
+    def read_commands(self):
+        """Lit le fichier Records/commandes.txt et remplit controls_recorded + conditions_t0 (+ éventuels parametres) de replay."""
+        path_cmd = RECORDS_DIR / "commandes.txt"
+        try:
+            with open(path_cmd, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 # Format JSON: contient les conditions initiales et les commandes sous la forme:
-                # {"parametres": {position, vitesse, angles, vitangul?, ...}, "steps": [...]} 
-                # ou  un step est un dictionnaire: {"volant": x, "gaz": y, "frein": z}
+                # {"conditions_t0": {position, vitesse, angles, vitangul?, ...},
+                #  "parametres": {h_cdg, ouverture, transm},
+                #  "steps": [...]}
+                # où un step est un dictionnaire: {"volant": x, "gaz": y, "frein": z}
                 self.controls_recorded = data["steps"]
-                self._replay_parametres = data.get("parametres", {})
+                self.cond_t0_recorded = data.get("conditions_t0", {})
+                parametres = data.get("parametres")
+                if isinstance(parametres, dict):
+                    # Si des paramètres dynamiques sont fournis, on les applique via Kart.update_parametres
+                    h_cdg = parametres.get("h_cdg", self.kart.h_cdg)
+                    ouverture = parametres.get("ouverture", self.kart.ouverture)
+                    transm = parametres.get("transm", self.kart.transm)
+                    self.kart.update_parametres(h_cdg, ouverture, transm)
+            print(f"Commandes lues depuis '{path_cmd}'.")
+            # Des commandes sont disponibles : on autorise le bouton REPLAY
+            self.btn_replay.config(state="normal")
+        except FileNotFoundError:
+            print(f"Fichier '{path_cmd}' introuvable, pas de lecture de commandes.")
+            self.controls_recorded = []
+            self.cond_t0_recorded = None
+            # Pas de commandes : on désactive REPLAY
+            self.btn_replay.config(state="disabled")
+
+    def record_replay(self):
+        """Action sur le bouton REPLAY: rejoue le contenu de self.controls_recorded (déjà renseigné)."""
+        self.record_status = False
+        # Si aucune commande n'est chargée, on ne lance pas de replay
+        if not self.controls_recorded:
+            print("Aucune commande enregistrée dans controls_recorded, lancer READ d'abord.")
+            return
+
+        # On indique qu'on est en mode replay avant le reset pour ne pas vider controls_recorded
+        self.replay_status = True
 
         self.reset()
 
-        # Initialiser le kart selon parametres du fichier (état initial enregistré)
-        p = getattr(self, "_replay_parametres", None)
+        # Initialiser le kart selon les conditions_t0 du fichier (état initial enregistré)
+        p = getattr(self, "cond_t0_recorded", None)
         if p:
             position = np.array(p["position"]) if "position" in p else None
             vitesse = np.array(p["vitesse"]) if "vitesse" in p else None
@@ -392,7 +426,6 @@ class SimulationUI(User_Interface):
             vitangul = np.array(p["vitangul"]) if "vitangul" in p else None
             if position is not None or vitesse is not None or angles is not None or vitangul is not None:
                 self.kart.init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
-            self._replay_parametres = None
     
     def animation_step(self):
         """Effectue une étape d'animation (UI + core)

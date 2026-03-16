@@ -16,17 +16,20 @@
 
 - V1.0 - Mars 2026 - restructuration pour compatibilité RL: séparation Classes SimulationCore, SimulationUI, Kart, Mobile suivant le fichier STRUCTURE_TARGET et Main_simul_manuelle.py pour faire ce que je faisai jusqu'à présent avec ce programme, et je crée un dépot distant Simulateur_Kart dans Github, maisje laisse le dépot local dans mon dossier Python dropbox, on verra bien.
 
+V1.1: J'ajoute les boutons RECORD, REPLAY, READ pour soit enregistrer un pilotage manuel, soit lire un fichier de commandes qui pourra être enregistrée par une simulation d'apprentissage de l'agent, avec une syntaxe appropriété qui stocke les conditions initiales, les paramètres de la simulation, et la liste des commandes du run.
+
+Et je code un premier programme d'exploration de Q pour voir ce qu'on a dedans après 20 000 runs. Je trouve
+la matrice Q très disymétrique, ce qui me chagrine. Je passe 4 heures à valider la totale symétrie de mon kart, et je montre avec un programme test dédié que le Q_L qu'ou trouve est bien mirroir de Q_R quand on lance deux learning identiques avec des conditions initiales miroirs et graines identiques. Donc le résultat d'une matrice Q encore fortement dysymétrique est le résultat d'un apprentissage encore très imparfait, même après 20K runs...
 
 # TODO
 
+
 voir l'état du epsilon quand je relance un Qlearning
 
+Faire une syntaxe lisible dans commandes. txt, avec que des tuples (x,y,y) et des commentaires # et des commandes "repeat N"
+
+
 tracer un circuit faisable
-
-Supprimer l'asservissement vitesse lacet
-
-reprendre les sorties de step
-
 
 # EVOLUTIONS A FAIRE
 

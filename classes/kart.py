@@ -154,8 +154,11 @@ class Kart(Mobile):
         self.gard = 0 # glissement de la roue arrière droite
 
     @property   
-    def _profil(self):    
-        """Retourne la liste des vecteurs necessaires au tracé du kart en repère véhicule"""
+    def profil_absolu(self):    
+        """Retourne un profil complet x,y à plotter du véhicule, c'est à dire la liste des vecteurs necessaires 
+        au tracé du kart en repère absolu"""
+
+        # Tracons d'abord le profil en repère véhicule
         # D'abord les quatres vecteurs position des angles chassis """
         # premier point = coin ARD près de la roue, deuxième en arg, puis avg puis avd
         X = np.array([[-self.axar, self.lar,0], [-self.axar,-self.lar,0],
@@ -166,14 +169,10 @@ class Kart(Mobile):
         X = np.append(X, tourne_vecteur(self.roue_avd.profil(), self.tetad) + self.roue_avd.position, axis=0)
         X = np.append(X, self.roue_arg.profil() + self.roue_arg.position, axis=0)
         X = np.append(X, self.roue_ard.profil() + self.roue_ard.position, axis=0)
-        return X
-    
-    @property
-    def profil_absolu(self):
-        """Retourne un profil complet x,y à plotter du véhicule"""
-        # on tourne la voiture de l'angle lacet, puis on la place à sa position
-        X = vehicule2piste(self._profil, self.angles[0]) + np.array([self.position[0], self.position[1], 0.])
-        return list(X[:, 0]), list(X[:, 1]) # x,y du profil du kart en repère absolu
+
+        # passage en absolu: on tourne la voiture de l'angle lacet, puis on la place à sa position
+        X_abs = vehicule2piste(X, self.angles[0]) + np.array([self.position[0], self.position[1], 0.])
+        return list(X_abs[:, 0]), list(X_abs[:, 1]) # x,y du profil du kart en repère absolu
 
     def update_parametres(self, h_cdg, ouverture, transm):
         """ Met à jour les paramètres du kart

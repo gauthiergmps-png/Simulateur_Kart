@@ -9,7 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import pickle
 import json
+import random
 """ """
+
+# Pour rendre les exécutions reproductibles (utile pour les tests de symétrie / debug)
+SEED = 12345
+np.random.seed(SEED)
+random.seed(SEED)
 
 MAX_Y = 1
 
@@ -26,16 +32,17 @@ class SimuKart():
         self.kart.init_state(vitesse=np.array([5., 0., 0.]))
 
         # 5 actions = 5 angles volant possibles (en degrés)
-        self.volant_angles = [-10, -5, 0, 5, 10]
+        self.volant_angles = [10, 5, 0, -5, -10]
         n_actions = len(self.volant_angles)
         self.action_space = type('ActionSpace', (), { 'n': n_actions,
             'sample': lambda self: np.random.randint(0, self.n) })()
 
-    def reset(self, last=False):
+    def reset(self, last=False, mirror=False):
         """reset(last=False) -> (observation, info). Si last=True, info contient 'initial_state' (position, vitesse, angles, vitangul)."""
         self.simu.reset()
         # Redonner une vitesse initiale (sinon kart reste à l'arrêt)
-        self.kart.init_state(vitesse=np.array([10., 0., 0.]))
+        Y_init = 0.1 if not mirror else -0.1
+        self.kart.init_state(position=np.array([0., Y_init, 0.]), vitesse=np.array([10., 0., 0.]))
         x, y = self.kart.position[0], self.kart.position[1]
         lacet = self.kart.angles[0]
         omega = self.kart.vitangul[0]
@@ -73,8 +80,6 @@ class SimuKart():
         """close()"""
         pass
 
-
-
 """Fonction principale du premier agent pilote de Kart"""
 print("Initialisation du premier agent pilote de Kart...")
 
@@ -102,24 +107,29 @@ def max_dict(d):
     return max_key, max_v
 
 def create_bins():
-    # On a quatre variables d'observation, avec des amplitudes propres,  on les discrétise en 10 bins chacune
+    # On a trois variables d'observation, avec des amplitudes propres, on les discrétise en 8 bornes chacune.
     # obs[0] -> cart position en Y de -10 à 10
     # obs[1] -> cart angle de lacet en radians de -pi à pi
     # obs[2] -> cart velocity angulaire en radians/s de -1 à 1
+    # Les valeurs d'états calcutées ensuite vaudront de 0 à 8, les valeurs 0 et 8 étant utilisées 
+    # pour les valeurs dépassant les gammes indiquées ci-dessous, qui ne sont donc pas des limites infranchissables.
+    # ce qui permet d'avoir quatre bins 0, 1, 2, 3 pour les valeurs négatives, une bin n° 4 pour les valeurs
+    # autour de zéro, et quatre bins 5 , 6, 7, 8 pour les valeurs positives. 
     
-    bins = np.zeros((3,10))
-    bins[0] = np.linspace(-2, 2, 10)
-    bins[1] = np.linspace(-np.pi/8, np.pi/8, 10)
-    bins[2] = np.linspace(-0.1, 0.1, 10)
+    bins = np.zeros((3,8))
+    bins[0] = np.linspace(-MAX_Y, MAX_Y, 8)
+    bins[1] = np.linspace(-np.pi/8, np.pi/8, 8)
+    bins[2] = np.linspace(-0.1, 0.1, 8)
 
     return bins
 
 def assign_bins(observation, bins):
-    """ Chaque observation → indice 0-9 (10 bins). np.digitize renvoie 1..10, on ramène à 0-9. """
+    """ Chaque observation → indice 0-8 (9 bins). np.digitize renvoie 0-8
+        donc les bins 0 et 8 ne serviront pas si l'observation reste dans les gammes indiquées . """
     state = np.zeros(STATE_DIM, dtype=int)
     for i in range(STATE_DIM):
-        # digitize donne 1..10 pour 10 bords ; on clip à 0-9 pour toujours 1 chiffre par dimension
-        state[i] = np.clip(np.digitize(observation[i], bins[i]) - 1, 0, 9)
+        # digitize donnera 0...9 soit dix valeurs pour 0...8 = 9 bords de bins(), donc pas de clip à faire
+        state[i] = np.digitize(observation[i], bins[i])
     return state
 
 def get_state_as_string(state):
@@ -157,17 +167,24 @@ def play_one_game(bins, Q, eps=0.5, verbose=False, record=False):
 
     while not done:
         cnt += 1
+
+        # on arrive a un état jamais visité, donc qui n'est pas dans Q, on l'initialise la valeur de Q à 0 pour toutes les actions possibles
         if state not in Q:
             Q[state] = {a: 0.0 for a in range(env.action_space.n)}
-        # ON choisi l'action, prop espilon au hasard, prob 1-eps greedy, i.e la "meilleure" action connue dans cet état
+
+        # On choisi l'action, prop espilon au hasard, prob 1-eps greedy, i.e la "meilleure" action connue dans cet état
         if np.random.uniform() < eps:
             # choix d'une action au hasard
             act = env.action_space.sample()
         else:
             # choix de la meilleure action connue dans cet état
             act = max_dict(Q[state])[0]
+
+        # On enregistre les commandes si on est en mode record
         if record and commandes is not None:
             commandes.append(act)
+
+        # On fait un pas de simulation
         observation, reward, terminated, truncated, info = env.step(act)
         done = terminated or truncated
         if verbose:
@@ -183,6 +200,7 @@ def play_one_game(bins, Q, eps=0.5, verbose=False, record=False):
         if state_new not in Q:
             Q[state_new] = {a: 0.0 for a in range(env.action_space.n)}
         a1, max_q_s1a1 = max_dict(Q[state_new])
+
         # Cible TD : pas de bootstrap depuis l'état terminal (épisode fini)
         target = reward if done else (reward + GAMMA * max_q_s1a1)
         Q[state][act] += ALPHA * (target - Q[state][act])
@@ -195,8 +213,12 @@ def play_one_game(bins, Q, eps=0.5, verbose=False, record=False):
 
 
 def save_last_commandes(Q, commandes, initial_state):
-    """Enregistre Q et la séquence de commandes dans Records/ (appelée par play_one_game quand record=True).
-    Format commandes: JSON {"parametres": {position, vitesse, angles, vitangul, ...}, "steps": [...]}."""
+    """Appelé à la fin d'une séquence d'apprentissage: Enregistre dans le dossier Records/ le dernier état de Q 
+	ainsi que la séquence de commandes du dernier run.
+    Format commandes.txt: JSON {"conditions_t0": {position, vitesse, angles, vitangul, ...}, "steps": [...]}.
+	où chaque step de commande est un dictionnaire: {"volant": x, "gaz": y, "frein": z}
+	Pour que ce fichier soit utilisable par la fonction REPLAY de l'interface utilisateur de simulation.py
+	"""
     if commandes is None:
         return
     RECORDS_DIR.mkdir(parents=True, exist_ok=True)
@@ -209,11 +231,32 @@ def save_last_commandes(Q, commandes, initial_state):
         {"volant": env.volant_angles[indice], "gaz": 0, "frein": 0}
         for indice in commandes
     ]
-    data = {"parametres": initial_state if initial_state is not None else {}, "steps": steps}
+    parametres = {
+        "h_cdg": env.kart.h_cdg,
+        "ouverture": env.kart.ouverture,
+        "transm": env.kart.transm,
+    }
+    data = {
+        "conditions_t0": initial_state if initial_state is not None else {},
+        "parametres": parametres,
+        "steps": steps,
+    }
     with open(path_cmd, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"Commandes sauvegardées dans '{path_cmd}'.")
 
+def load_Q_from_file(fichier_q=None):
+	"""Charge un fichier Q enregistré dans le dossier Records/"""
+	if fichier_q is None:
+		fichier_q = input("Nom du fichier Q à charger (dans Records/) ? ").strip()
+	path_q = RECORDS_DIR / fichier_q
+	try:
+		with open(path_q, "rb") as f:
+			Q = pickle.load(f)
+		print(f"Table Q chargée depuis '{path_q}'.")
+	except FileNotFoundError:
+		print(f"Fichier '{path_q}' introuvable")
+	return Q
 
 def play_many_games(bins, N=500, record=False):
     """Lance une série de N épisodes de simulation.
@@ -222,15 +265,7 @@ def play_many_games(bins, N=500, record=False):
     # Choix : initialiser Q ou charger une version enregistrée (fichiers dans Records/)
     use_saved = input("Charger un Q enregistré ? (o/n) : ").strip().lower()
     if use_saved == 'o':
-        fichier_q = input("Nom du fichier Q à charger (dans Records/) ? ").strip()
-        path_q = RECORDS_DIR / fichier_q
-        try:
-            with open(path_q, "rb") as f:
-                Q = pickle.load(f)
-            print(f"Table Q chargée depuis '{path_q}'.")
-        except FileNotFoundError:
-            print(f"Fichier '{path_q}' introuvable, initialisation de Q.")
-            Q = initialize_Q()
+        Q = load_Q_from_file()
     else:
         Q = initialize_Q()
 
@@ -264,7 +299,5 @@ if __name__ == '__main__':
     record = input("Sauvegarder Q et commandes dans Records/ après la session ? (o/n) : ").strip().lower() == 'o'
 
     episode_lengths, episode_rewards, Q = play_many_games(bins, N, record=record)
-
-    plot_running_avg(episode_rewards)
 
     env.close()

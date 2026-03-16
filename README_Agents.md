@@ -16,7 +16,11 @@ step 6000 encore beaucoup autour de 300, mais je vois passer quelque fois des 40
 step 8000, on est plutot à 380 de moyenne
 La courbe est très parlante, gros progrès à 6300, et à 7000 on a fini d'apprendre, plateau ensuite.
 
+Quand je relance un learning avec le même Q, je repars avec un epsilon trop élevé, qui passe à moins de 3% uniquement au step 1000, donc il a le temps de pourrir ce que j'avais déjà appris, non ? A comprendre
 
+Quand je relance pour un nouvel apprentissage de 10000 runs supplémentaire, la courbe d'apprentissage a un aspect surprenant:
+On repart de bas avec un cycle périodique bon/mauvais de quelques centaines de runs, les deux en croissance régulière, et très brutalement vers 5000 cycles, il "trouve le truc" pour finir le nombre de max_cycles et en reste proche, avec une performance plutot en plateau et quelques explorations pitoyables.
+ 
 
 
 NEXT STEP: SUIVRE UN CIRCUIT VITESSE CONSTANTE
