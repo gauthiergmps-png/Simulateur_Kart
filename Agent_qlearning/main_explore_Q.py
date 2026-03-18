@@ -31,7 +31,8 @@ from tkinter import filedialog, messagebox
 import numpy as np
 
 
-RECORDS_DIR = os.path.join(os.path.dirname(__file__), "Records")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+RECORDS_DIR = os.path.join(PROJECT_ROOT, "Records")
 
 
 class QExplorerApp:

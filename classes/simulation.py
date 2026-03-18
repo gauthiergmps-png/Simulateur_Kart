@@ -3,6 +3,8 @@ import numpy as np
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+from classes.kart import Kart
+from .utils import vehicule2piste, piste2vehicule, norme_vecteur
 
 if TYPE_CHECKING:
     from .kart import Kart
@@ -29,6 +31,8 @@ class SimulationCore:
     def __init__(self, kart: "Kart"):
         self.kart = kart
         self.debug = False
+        self.regul=False
+        self.vold = 0.
         self.reset()
     
     def reset(self):
@@ -71,15 +75,23 @@ class SimulationCore:
         # Utilisation des asservissements pour la simulation interactive
         if simu_controls is not None:
             regul = simu_controls['regul']
-            vold = simu_controls['vold']
             ass_d = simu_controls['ass_d']
             ass_d0 = simu_controls['ass_d0']
             ass_dgain_stat = simu_controls['ass_dgain_stat']
             ass_dgain_dyn = simu_controls['ass_dgain_dyn']
           
             # Régulateur vitesse
-            if regul and V != 0.:
-                self.kart.vitesse = vold / V * self.kart.vitesse
+            if not self.regul and regul and V != 0.:
+                # On vient de d'allumer le régulateur de vitesse
+                self.regul = True
+                self.vold = V
+            elif self.regul and regul:
+                # On continue à réguler la vitesse
+                self.kart.vitesse = self.vold / V * self.kart.vitesse
+            elif self.regul and not regul:
+                # On vient de déconecter le régulateur de vitesse
+                self.regul = False
+                self.vold = 0.
             
             # Asservissement V_lacet
             if ass_d:
@@ -98,14 +110,21 @@ class SimulationCore:
 
 
 class SimulationUI(User_Interface):
-    """Classe gérant la simulation manuelle avec interfaces utilisateurs Via Tkinter."""
+    """Classe gérant la simulation manuelle avec interfaces utilisateurs Via Tkinter.
+     Elle hérite de la classe User_interface donc de tous ses attributs et méthodes."""
+
+    # Déclaration de type pour le linter
     kart: "Kart"
 
-    def __init__(self, kart: "Kart"):
-        """Initialise le gestionnaire de simulation avec UI."""
-        super().__init__(kart)
 
-        self.core = SimulationCore(kart)
+    def __init__(self):
+        """Initialise le gestionnaire de simulation avec UI."""
+        super().__init__()
+
+        # Création des instances 
+        self.kart = Kart()
+        self.core = SimulationCore(self.kart)
+
         self.debug = False
         self.hist_xcdg = []
         self.hist_ycdg = []
@@ -201,9 +220,30 @@ class SimulationUI(User_Interface):
         """Gère le relâchement des touches"""
         self.debug = False
     
-    def profil_circuit(self, x_cdg, y_cdg, type=0):
-        """Retourne un profil complet x,y du circuit"""
-        if type == 0:
+    def profil_circuit(self, x_cdg, y_cdg):
+        """Retourne un profil complet du circuit en coordonnées absolues
+        sous forme d'une liste d'élements comprend:
+        (x, y) position du point
+        (nx, ny) vecteur unitaire normal à la trajectoire orienté vers la gauche de la trajectoire
+        curvature: courbure de la trajectoire en chaque point
+        
+        """
+        def profil_segment(P0, P2):
+            L = np.linalg.norm(P2 - P0)
+            n = int (L)
+            x = np.linspace(P0[0], P2[0], n-1)
+            y = np.linspace(P0[1], P2[1], n-1)
+            return x, y
+
+        def profil_arc(C, R, theta_start, theta_end):
+            # attention, Y+ est vers le bas, donc les angles sont inversés par rapport au sens trigonométrique
+            n = int (3.14 * R )
+            t = np.linspace(theta_start, theta_end, n)[:-1]
+            x = C[0] + R * np.cos(t)
+            y = C[1] + R * np.sin(t)
+            return x, y
+
+        if self.circuit.get() == 0:
             # type_circuit = 0: quadrillage 10 x 10 autour du kart
             Xo = np.array([10. * np.floor(x_cdg / 10.), 10. * np.floor(y_cdg / 10.)])
             H = np.array([10., 0.])
@@ -213,13 +253,67 @@ class SimulationUI(User_Interface):
             X = np.append(X, [Xo - V, Xo - V - H, Xo - H, Xo + 2 * H, Xo + 2 * H - V, 
                             Xo + H - V, Xo + H + 2 * V, Xo + 2 * H + 2 * V, 
                             Xo + 2 * H + V, Xo - H + V, Xo - H + 2 * V, Xo + 2 * V], axis=0)
-        elif type == 1:
-            # type_circuit = 1: anneau de 50m de rayon
+        elif self.circuit.get() == 1:
+            # type_circuit = 1: Axe_X, donc un segment 
+            X = np.array([[-10., 0.], [10., 10.]])
+        elif self.circuit.get() == 2:
+            # type_circuit = 2: cercle de 50m de rayon
             x = np.linspace(0, 2 * np.pi, 100)
             R = 50.
             X = np.zeros((100, 2))
             X[:, 0] = R * np.cos(x)
             X[:, 1] = R * (-1 + np.sin(x))
+        elif self.circuit.get() == 3:
+            # type_circuit = 3: ligne droite 60m vers +X, puis demi cercle virage à gauche de rayon de 30m, 
+            # donc vers -X, puis ligne droite de longeur 30m vers -X, puis quart de cerle à droite rayon de 30m, 
+            # puis une ligne droite vers -Y de longueur 20m, puis demi cercle à gauche de 20 m de rayon, 
+            # un bout de ligne droite de longueur 40m vers -Y (car +Y est orienté vers le bas), 
+            # puis un quart de cercle à droite de rayon de 40m pour revenir sur l'origine
+            # on vise un point par mêtre en gros
+
+            # Point de départ et cap initial (vers +X)
+            P0 = np.array([0., 0.])
+
+            # 1) Segment de 60 m vers +X, on s'arrête un mêtre  avant d'arriver au point final
+            P1 = P0 + np.array([60., 0.])
+            x1, y1 = profil_segment(P0, P1)
+
+            # 2) A partir de P1, Demi-cercle à gauche, rayon 30 m
+            C = P1 + np.array([0., -30.])
+            x2, y2 = profil_arc(C, 30.,np.pi / 2, -np.pi / 2)
+        
+            # 3) A partir de P2,Segment de 30 m vers -X, on s'arrête un mêtre  avant d'arriver au point final
+            P2= C + np.array([0., -30.])
+            P3 = P2 + np.array([-30., 0.])
+            x3, y3 = profil_segment(P2, P3)
+
+            # 4) A partir de P3, Quart de cercle à droite, rayon 30 m
+            C = P3 + np.array([0., -30.])
+            x4, y4 = profil_arc(C, 30., np.pi / 2, np.pi)
+
+            # 5) A partir de P4, Ligne droite 20 m vers -Y, on s'arrête un mêtre  avant d'arriver au point final
+            P4 = P3 + np.array([-30., -30.])
+            P5 = P4 + np.array([0., -20.])
+            x5, y5 = profil_segment(P4, P5)
+
+            # 6) A partir de P5, Demi-cercle à gauche, rayon 20 m
+            C = P5 + np.array([-20., 0.])
+            x6, y6 = profil_arc(C, 20., 0. , -np.pi)
+
+            # 7) A partir de P6, Ligne droite 40 m vers +Y, on s'arrête un mêtre  avant d'arriver au point final
+            P6 = P5 + np.array([-40., 0.])
+            P7 = P6 + np.array([0., 70.])
+            x7, y7 = profil_segment(P6, P7)
+
+            # # 8) A partir de P7, Quart de cercle à droite, rayon 40 m, pour revenir à proximité de l'origine (A DEFINIR précisément)
+            C = P7 + np.array([40., 0.])
+            x8, y8 = profil_arc(C, 40., np.pi, np.pi / 2)
+
+            # Concaténation de tous les segments / arcs :
+            # X_x est la juxtaposition des listes x1, x2, x3 (et idem pour Y)
+            X_x = np.concatenate([x1, x2, x3, x4, x5, x6, x7, x8])
+            X_y = np.concatenate([y1, y2, y3, y4, y5, y6, y7, y8])
+            X = np.column_stack((X_x, X_y))
         else:
             raise ValueError(f"Type de circuit non valide: {type}")
 
@@ -241,7 +335,7 @@ class SimulationUI(User_Interface):
         lacet = self.kart.angles[0]
         
         # CALCUL ET TRACE DU CIRCUIT OU FOND DE PISTE
-        x, y = self.profil_circuit(xcdg, ycdg, type=1)
+        x, y = self.profil_circuit(xcdg, ycdg)
         circuit = []
         for i in range(0, len(x)):
             circuit += [abs2canvas(x[i], y[i], origx, origy)]
@@ -488,15 +582,36 @@ class SimulationUI(User_Interface):
 
         # Mise à jour position caméra
         self.scale = self.cam_alt.get()
-        self.update_camera_position()
+        self.update_camera_position(self.kart.position)
         
         # Affichage
         self.dessin_canvas(self.echelle_dyn.get())
         
         # Mise à jour télémesures
+        # Tous les calculs numériques sont faits ici, avant l'appel à update_telemetry
+        f_cdg_vec = piste2vehicule(self.kart.force_cdg, self.kart.angles[0])
+        force_cdg = norme_vecteur(f_cdg_vec)
+        norme_f_cdg = norme_vecteur(f_cdg_vec)
+        radius = (
+            1000000000.0
+            if norme_f_cdg < 0.00001
+            else self.kart.masse * V * V / norme_f_cdg
+        )
+        t_cyclemax_ms = int(self.t_cyclemax * 1000)
+        t_framemax_ms = int(self.t_framemax * 1000)
+        pos_x, pos_y, pos_z = self.kart.position
+        vit_x, vit_y, _ = self.kart.vitesse
+        lacet_deg = self.kart.angles[0] * 180.0 / np.pi
+        V_kmh = V * 3.6
+        f_cdg_x, f_cdg_y, f_cdg_z = f_cdg_vec
+        moment_cdg_z = self.kart.moment_cdg[2]
+        varbre = self.kart.v_arbre
+        vstab = float(np.dot(f_cdg_vec, vehicule2piste(self.kart.vitesse, self.kart.angles[0])))
+
         # Temps de cycle max = temps réel d'une frame (step + caméra + dessin + télémesure), en secondes
-        self.update_telemetry(self.core.pas_simul, self.core.temps, self.t_cyclemax, self.t_framemax, self.kart.force_cdg, self.kart.moment_cdg,
-                            self.kart.position, self.kart.vitesse, self.kart.angles[0], V, self.gaz, F_com, self.kart.v_arbre, 0.)
+        self.update_telemetry(self.core.pas_simul, self.core.temps, t_cyclemax_ms, t_framemax_ms, F_com,
+                              pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, self.gaz, self.core.vold,
+                              f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg_z, radius, varbre, vstab)
 
         t_frame = time.time() - t0_frame
         if not self.simul_pause and self.core.temps > 1.:

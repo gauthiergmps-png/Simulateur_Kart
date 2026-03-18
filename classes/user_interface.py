@@ -1,20 +1,21 @@
 import tkinter as tk
 from abc import abstractmethod
 import numpy as np
-import time
-from tkinter import (Tk, ttk, Canvas, Frame, Button, LEFT, RIGHT, TOP, BOTTOM, 
+from tkinter import (Tk, Canvas, Frame, Button, LEFT, RIGHT, TOP, BOTTOM, 
                      CENTER, HORIZONTAL, VERTICAL, ARC, LAST, Label, Scale,
-                     Checkbutton, Radiobutton, IntVar, W, N, S, DoubleVar)
-from .utils import tourne_vecteur, vehicule2piste, piste2vehicule, norme_vecteur
-
+                     Checkbutton, Radiobutton, IntVar, W, N, S)
 
 class User_Interface:
-    """Classe gérant l'interface utilisateur du simulateur de kart"""
+    """Classe gérant l'interface utilisateur Tkinter du simulateur de kart
+       A noter que cette classe ne connait pas encore le Kart, qui sera instancié
+       dans la classe SimulationUI qui est une classe qui hérite ce celle-ci
+       
+       Donc l'idée est de mettre ici tout ce qui ne dépend pas du Kart
+       
+       """
     
-    def __init__(self, kart):
-        """         Initialise l'interface utilisateur.  Args:   kart: Instance de la classe Kart """
-
-        self.kart = kart
+    def __init__(self):
+        """         Initialise l'interface utilisateur"""
         
         # Variables d'état de l'interface
         self.fenetre = None
@@ -31,6 +32,7 @@ class User_Interface:
         
         # Variables d'état (initialisées après création de la fenêtre)
         self.commandes = None
+        self.circuit = 0
         self.methode = None
         self.regul = None
         self.ass_d = None
@@ -38,7 +40,6 @@ class User_Interface:
         
         # Variables de simulation
         self.F_com = []
-        self.Vold = 0.
         self.t_cyclemax = 0.
         self.simul_pause=True
         
@@ -68,6 +69,7 @@ class User_Interface:
         """Crée le panneau de contrôle avec tous les widgets"""
         # Initialisation des variables Tkinter après création de la fenêtre
         self.commandes = IntVar()
+        self.circuit = IntVar()
         self.methode = IntVar()
         self.regul = IntVar()
         self.ass_d = IntVar()
@@ -109,7 +111,8 @@ class User_Interface:
         self._create_steering_frame(frames['frame3'])
 
         # Frame 4 - Espace réservé pour contrôles futurs
-        # (pas de boutons dupliqués)
+        self._create_circuits_frame(frames['frame4'])
+
 
         # Frame 5 - Régulateur et asservissement
         self._create_regulator_frame(frames['frame5'])
@@ -193,14 +196,21 @@ class User_Interface:
         self.H_cdg.set(0)
         self.H_cdg.pack()
     
+    def _create_circuits_frame(self, frame):
+        """Crée le frame des commandes"""
+        Label(frame, text="""Circuit:""", justify=LEFT, padx=20).pack()
+        Radiobutton(frame, text="Damier", padx=20, variable=self.circuit, value=0).pack(anchor=W)
+        Radiobutton(frame, text="Y axis", padx=20, variable=self.circuit, value=1).pack(anchor=W)
+        Radiobutton(frame, text="Circuit 2", padx=20, variable=self.circuit, value=2).pack(anchor=W)
+        Radiobutton(frame, text="Circuit 3", padx=20, variable=self.circuit, value=3).pack(anchor=W)
+        Radiobutton(frame, text="Circuit 4", padx=20, variable=self.circuit, value=4).pack(anchor=W)
+        self.circuit.set(0)
+    
     def _create_regulator_frame(self, frame):
         """Crée le frame du régulateur de vitesse"""
-        def set_v():
-            if self.regul.get():
-                self.Vold = norme_vecteur(self.kart.vitesse)
         
         Checkbutton(frame, text="Regulateur de vitesse", padx=20, variable=self.regul,
-                   onvalue=1, command=set_v, offvalue=0).pack(anchor=W)
+                   onvalue=1, offvalue=0).pack(anchor=W)
         
         self.ass_d = IntVar()
         Checkbutton(frame, text="Asserv. d", padx=20, variable=self.ass_d,
@@ -303,30 +313,36 @@ class User_Interface:
         """Lit un fichier de commandes et remplit self.controls_recorded (et éventuels paramètres associés)."""
         pass
     
-    def update_telemetry(self, pas_simul, temps, t_cyclemax, t_framemax, force_cdg, moment_cdg, 
-                        position, vitesse, lacet, V, gaz, F_com, varbre, vold):
-        """Met à jour l'affichage de télémesure"""
-        # Télémesure 1
-        texteaff = (f"N= {pas_simul:10}  T = {temps:6.2f}  Tcyclemax = {int(t_cyclemax*1000):3d} ms Tframemax = {int(t_framemax*1000):3d} ms "
-                   f"F_com = {F_com:5d}  X = {position[0]:6.2f}   Y = {position[1]:6.2f}   Z = {position[2]:6.2f} "
-                   f"Vx = {vitesse[0]:6.2f}  Vy = {vitesse[1]:6.2f}   Lacet = {lacet*180./np.pi:6.2f} "
-                   f"V =  {V:6.2f} m/s =  {V*3.6:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f}")
+    def update_telemetry(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com,
+                         pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, gaz, vold,
+                         f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg, radius, varbre, vstab):
+        """Met à jour l'affichage de télémesure.
+
+        Tous les calculs numériques doivent être faits en amont :
+        cette fonction se contente d'afficher les valeurs passées en arguments.
+        """
+        # Télémesure 1 (affichage direct des arguments formatés)
+        texteaff = (
+            f"N= {pas_simul:10}  T = {temps:6.2f}  "
+            f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "
+            f"F_com = {F_com:5d}  X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Z = {pos_z:6.2f} "
+            f"Vx = {vit_x:6.2f}  Vy = {vit_y:6.2f}   Lacet = {lacet_deg:6.2f} "
+            f"V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f}"
+        )
         self.telemesure1.config(text=str(texteaff))
-        
-        # Télémesure 2
-        radius = (1000000000. if (norme_vecteur(force_cdg) < 0.00001) 
-                  else self.kart.masse * V * V / norme_vecteur(force_cdg))
-        f_cdg = piste2vehicule(force_cdg, lacet)
-        texteaff = (f"FORCES APPLIQUES AU CDG:  "
-                   f"Fcdg x ={f_cdg[0]:^+10.2f}  Fcdg y ={f_cdg[1]:^+10.2f}  Fcdg z ={f_cdg[2]:^+10.2f} "
-                   f"F_cdg = {norme_vecteur(force_cdg):^+10.2f} Mcdg ={moment_cdg[2]:^+10.2f}   Radius ={radius:^+10.2f} "
-                   f"Varbre = {varbre:^+10.2f}  Vstab = {np.dot(force_cdg,vehicule2piste(vitesse, lacet)):^+10.2f}")
+
+        # Télémesure 2 (affichage direct des arguments formatés)
+        texteaff = (
+            "FORCES APPLIQUES AU CDG:  "
+            f"Fcdg x ={f_cdg_x:^+10.2f}  Fcdg y ={f_cdg_y:^+10.2f}  Fcdg z ={f_cdg_z:^+10.2f} "
+            f"F_cdg = {force_cdg:^+10.2f} Mcdg ={moment_cdg:^+10.2f}   Radius ={radius:^+10.2f} "
+            f"Varbre = {varbre:^+10.2f}  Vstab = {vstab:^+10.2f}"
+        )
         self.telemesure2.config(text=str(texteaff))
     
-    def update_camera_position(self):
+    def update_camera_position(self, position):
         """Met à jour la position de la caméra drone en fonction de la position du kart passée en argument"""
         self.speedcam = self.cam_speed.get()
-        position = self.kart.position
         self.xcam = (self.speedcam * position[0] + (self.cam_speedmax - self.speedcam) * self.xcam) / self.cam_speedmax
         self.ycam = (self.speedcam * position[1] + (self.cam_speedmax - self.speedcam) * self.ycam) / self.cam_speedmax
         

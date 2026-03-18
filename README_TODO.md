@@ -1,4 +1,4 @@
- # HISTORIQUE ET REFLEXIONS STRATEGIQUES
+ # HISTORIQUE DES VERSIONS DU CODE
 
 - V0.0: animation d'un carré, GUI = Matplotlib
 - V0.1: dessin voiture avec roues orientables
@@ -18,26 +18,32 @@
 
 V1.1: J'ajoute les boutons RECORD, REPLAY, READ pour soit enregistrer un pilotage manuel, soit lire un fichier de commandes qui pourra être enregistrée par une simulation d'apprentissage de l'agent, avec une syntaxe appropriété qui stocke les conditions initiales, les paramètres de la simulation, et la liste des commandes du run.
 
-Et je code un premier programme d'exploration de Q pour voir ce qu'on a dedans après 20 000 runs. Je trouve
-la matrice Q très disymétrique, ce qui me chagrine. Je passe 4 heures à valider la totale symétrie de mon kart, et je montre avec un programme test dédié que le Q_L qu'ou trouve est bien mirroir de Q_R quand on lance deux learning identiques avec des conditions initiales miroirs et graines identiques. Donc le résultat d'une matrice Q encore fortement dysymétrique est le résultat d'un apprentissage encore très imparfait, même après 20K runs...
+Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 000 runs, c'est très disymétrique, à exploiter donc.
+
+V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet
 
 # TODO
-
-
+Agent:
+Symétriser la matrice Q pour exploiter la symétrie du problème
 voir l'état du epsilon quand je relance un Qlearning
 
+SimulUI:
+Ajouter un choix d'agents de controle, Q_Learning, DQ_Learning,... qui utiliseront les résultats de chaque étape.
+Choisir une trajectoire
 Faire une syntaxe lisible dans commandes. txt, avec que des tuples (x,y,y) et des commentaires # et des commandes "repeat N"
 
+Circuits&trajectoires:
+sauvegarder les trajectoires avec vecteurs normaux, et fonction "écart position" du kart
 
-tracer un circuit faisable
 
-# EVOLUTIONS A FAIRE
+# EVOLUTIONS FONCTIONNELLES A FAIRE
 
 Faire marcher un RL à vitesse constante sur un circuit donnée
 
+Pas forcement compliquer d'ajouter le paramètre raideur suspension, avec une masse en haut d'un pole souple.
 
 
- # REFLEXIONS STRATEGIQUES
+ # REFLEXIONS STRATEGIQUES (HORS SUJET REGLAGE AGENT, voir README dédié)
 
 Vision Long terme initiale:
  V1.0: kart rigide Z0 totalement débugé, etude impact differentiel sur quelques circuits tests
@@ -69,7 +75,6 @@ mi 2025: je vise runge kutta et lecture de fichier commande
 
 
 Mars 2026: On s'y remet, je suis un cours sur le reinforcement learning, très interessant. Il va donc falloir préparer ce code pour être utilisable en simulations headless, donc sans interface graphique, et donc redéfinir un peu mieux les classes de ce programme.
-Ce programme marche très bien sans GIT pour l'instant, on va continuer un peu.
 
-J
+
 

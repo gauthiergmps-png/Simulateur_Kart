@@ -1,3 +1,30 @@
+""" Premier agent: Q_Learning
+    Ce programme permet donc de produire une matrice Q de valeurs Q(s,a) 
+    pour toutes les combinaisons d'états s et d'actions a possibles.
+    Voir formation 2-9: Stratégie:
+        ● Off policy, model free, bootstrapped
+        ● Use epsilon greedy action selection for exploration
+        ● If random # < epsilon: explore else exploit
+        ● Decrease epsilon over time to a minimum value
+        ● Update action value function for greedy action
+
+Algoritme général:
+        Initialize arbitrary Q, terminal state gets 0
+        Repeat for large number of episodes:
+            Initialize the environment
+            For each step of the episode:
+            Select action a according to epsilon greedy policy
+            Take action and get reward and new state from env.
+            Set current state to new state
+        Epsilon start at 1, go down to 0.01 halfway through
+        50000 games, plot running average reward over last 100 games
+        alpha=0.1 and gamma=0.99
+        Q(St,At) = Q(St,At)+ alpha [ Rt+1+ gamma max a  Q(St +1, a) - Q(St, At )]
+        Digitize entire state space; use reasonable velocity bound
+
+"""
+
+
 import sys
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
