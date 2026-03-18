@@ -93,10 +93,10 @@ class CircuitSimulator:
         self.circuit_input_button.pack(fill=tk.X, pady=2)
         self.image_button = ttk.Button(circuit_frame, text="Charger Image Modèle", command=self.load_background_image)
         self.image_button.pack(fill=tk.X, pady=2)
-        ttk.Button(circuit_frame, text="Calculer Circuit Fin", command=lambda: self.calculate_circuit_fin(stop=True)).pack(fill=tk.X, pady=2)
         ttk.Button(circuit_frame, text="Recentrer Vue", command=self.recenter_view).pack(fill=tk.X, pady=2)
         ttk.Button(circuit_frame, text="Charger Circuit", command=self.load_circuit).pack(fill=tk.X, pady=2)
-        ttk.Button(circuit_frame, text="Sauvegarder Circuit", command=self.save_circuit).pack(fill=tk.X, pady=2)
+        self.circuit_save_button=ttk.Button(circuit_frame, text="Sauvegarder Circuit", command=self.save_circuit)
+        self.circuit_save_button.pack(fill=tk.X, pady=2)
         
         ttk.Label(circuit_frame, text="Largeur circuit (m):").pack(anchor=tk.W, pady=(10, 0))
         self.width_var = tk.DoubleVar(value=self.circuit.width)
@@ -119,7 +119,9 @@ class CircuitSimulator:
         self.pdp_input_button.pack(fill=tk.X, pady=2)
         ttk.Button(trajectory_frame, text="Calculer Trajectoire", command=lambda: self.calculate_trajectory(stop=True)).pack(fill=tk.X, pady=2)
         ttk.Button(trajectory_frame, text="Optimiser Trajectoire", command=self.optimisation_method).pack(fill=tk.X, pady=2)
-        ttk.Button(trajectory_frame, text="Exporter Trajectoire", command=self.export_trajectory).pack(fill=tk.X, pady=2)
+        ttk.Button(trajectory_frame, text="Charger Trajectoire", command=self.load_trajectory).pack(fill=tk.X, pady=2)
+        self.traj_save_button= ttk.Button(trajectory_frame, text="Sauvegarder Trajectoire", command=self.save_trajectory)
+        self.traj_save_button.pack(fill=tk.X, pady=2)
         ttk.Button(trajectory_frame, text="Create circuit test", command=self.def_circuit_test).pack(fill=tk.X, pady=2)
 
         self.trajectory_info_label = ttk.Label(trajectory_frame, text="", wraplength=200)
@@ -384,7 +386,6 @@ class CircuitSimulator:
             info += f"\nErreur: {e}"
         self.info_label.config(text=info)
         
-        
     def new_trajectory(self):
         """Crée une nouvelle trajectoire"""
         self.trajectory = Trajectoire("Trajectoire", is_closed=self.circuit.is_closed)
@@ -447,7 +448,6 @@ class CircuitSimulator:
         self.circuit_info_label.config(text=f"Circuit fin calculé: {len(self.circuit.fine_points)} points, "
                                     f"Longueur: {self.circuit.length:.1f}m")
 
-    
     def calculate_trajectory(self, motion=False, warning=False, stop=False):
         """Calcule et affiche la trajectoire, rapidement si motion=True"""
         if warning:
@@ -518,8 +518,24 @@ class CircuitSimulator:
         
     def save_circuit(self):
         """Sauvegarde le circuit en utilisant le FileManager"""
+        if self.circuit.input_mode:
+            messagebox.showerror("Erreur", "Le circuit est en mode saisie")
+            return
         if self.file_manager.save_circuit(self.circuit):
             self.circuit_info_label.config(text=f"Circuit sauvegardé")
+
+    def save_trajectory(self):
+        """Sauvegarde la trajectoire en utilisant le FileManager"""
+        if self.file_manager.save_trajectory(self.trajectory):
+            self.trajectory_info_label.config(text=f"Trajectoire sauvegardée")
+                
+    def load_trajectory(self):
+        """Charge la trajectoire en utilisant le FileManager"""
+        new_traj = self.file_manager.load_trajectory()
+        if new_traj:
+            self.trajectory = new_traj
+            self.update_plot(False)
+            self.trajectory_info_label.config(text="Trajectoire chargée")
                 
     def load_circuit(self):
         """Charge un circuit en utilisant le FileManager"""
@@ -531,11 +547,6 @@ class CircuitSimulator:
             self.trajectory.reset_fine_profile()
             self.update_plot(False)
             self.circuit_info_label.config(text=f"Circuit chargé")
-    
-    def export_trajectory(self):
-        """Exporte la trajectoire en utilisant le FileManager"""
-        if self.file_manager.export_trajectory(self.trajectory):
-            self.trajectory_info_label.config(text="Trajectoire exportée")
 
     def toggle_circuit_input(self):
         """Bascule le mode saisie circuit"""
@@ -579,6 +590,7 @@ class CircuitSimulator:
                                       f"\nType d'optimisation: {self.trajectory.optimization_type}"
                                       f"\nTemps au tour: {self.trajectory.lap_time:.2f} s")
         if self.circuit.input_mode:
+            self.circuit_save_button.config(state='disabled')
             self.circuit_input_button.config(text="Arrêter Saisie Circuit")
             if not self.circuit.is_ready_for_calculation():
                 self.circuit_input_button.config(state='disabled')
@@ -589,6 +601,7 @@ class CircuitSimulator:
                                                 "Echap pour annuler.")
         else:
             self.circuit_input_button.config(text="Saisie Circuit")
+            self.circuit_save_button.config(state='normal')
             self.info_label.config(text=f"RIEN A DIRE")
             if self.trajectory.input_mode:
                 self.circuit_input_button.config(state='disabled')
@@ -597,12 +610,14 @@ class CircuitSimulator:
             self.instructions_label.config(text="Circuit verrouillé. Cliquez pour déverrouiller.")
 
         if self.trajectory.input_mode:
+            self.traj_save_button.config(state='disabled')
             self.pdp_input_button.config(text="Arrêter Saisie PDP")
             self.instructions_label.config(text="Cliquez pour ajouter des points de passage.\n"
                                                "Clic droit pour effacer le dernier point.\n"
                                                "Echap pour annuler.")
         else:
             self.pdp_input_button.config(text="Saisie PDP")
+            self.traj_save_button.config(state='normal')
             if self.circuit.input_mode:
                 self.pdp_input_button.config(state='disabled')
             else:

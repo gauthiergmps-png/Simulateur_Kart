@@ -94,20 +94,28 @@ class Circuit(Profil):
         
     def to_dict(self):
         """Convertit le circuit en dictionnaire pour sauvegarde"""
-        profil_data = super().to_dict()
+        profil = super().to_dict()
         circuit_data = {
             'width': self.width,
             'left_border': self.left_border,
             'right_border': self.right_border}
-        data = {**profil_data, **circuit_data}
+        data = {'profil': profil, 'circuit_data': circuit_data}
         return data
         
     def from_dict(self, data):
         """Charge le circuit depuis un dictionnaire"""
-        super().from_dict(data)
-        self.width = data.get('width', self.width)
-        self.left_border = data.get('left_border', [])
-        self.right_border = data.get('right_border', [])
+        # Nouveau format (issu de to_dict): {'profil': {...}, 'circuit_data': {...}}
+        profil_data = data.get('profil', None)
+        circuit_data = data.get('circuit_data', None)
+
+        if profil_data is not None:
+            super().from_dict(profil_data)
+
+        if circuit_data is not None:
+            self.width = circuit_data.get('width', self.width)
+            self.left_border = circuit_data.get('left_border', [])
+            self.right_border = circuit_data.get('right_border', [])
+
 
 
 class Trajectoire(Profil):
@@ -218,25 +226,50 @@ class Trajectoire(Profil):
     def to_dict(self):
         """Convertit la trajectoire en dictionnaire pour sauvegarde"""
         
-        profil_data = super().to_dict()
-        traj_data={
-            'max_acceleration': self.max_acceleration,
-            'max_velocity': self.max_velocity,
-            'velocities': self.velocities,
-            'lap_time': self.lap_time,
-            'ecarts': self.ecarts
+        profil = super().to_dict()
+        def _jsonify(v):
+            """Rend un élément numpy sérialisable JSON (list/float/int Python)."""
+            if isinstance(v, np.ndarray):
+                return v.tolist()
+            if isinstance(v, (np.floating, np.integer)):
+                return v.item()
+            return v
+
+        velocities = self.velocities
+        velocities = _jsonify(velocities)
+        if isinstance(velocities, list):
+            velocities = [_jsonify(v) for v in velocities]
+
+        ecarts = self.ecarts
+        ecarts = _jsonify(ecarts)
+        if isinstance(ecarts, list):
+            ecarts = [_jsonify(e) for e in ecarts]
+
+        traj_data = {
+            'max_acceleration': _jsonify(self.max_acceleration),
+            'max_velocity': _jsonify(self.max_velocity),
+            'velocities': velocities,
+            'lap_time': _jsonify(self.lap_time),
+            'ecarts': ecarts
         }
-        data = {**profil_data, **traj_data}
+        data = {'profil': profil, 'traj_data': traj_data}
         return data
         
     def from_dict(self, data):
         """Charge la trajectoire depuis un dictionnaire"""
-        super().from_dict(data)
-        self.max_acceleration = data.get('max_acceleration', self.max_acceleration)
-        self.max_velocity = data.get('max_velocity', self.max_velocity)
-        self.velocities = data.get('velocities', [])
-        self.lap_time = data.get('lap_time', 0.0)
-        self.ecarts = data.get('ecarts', [])
+        # Nouveau format défini par to_dict : {'profil': {...}, 'traj_data': {...}}
+        profil_data = data['profil']
+        traj_data = data['traj_data']
+
+        # Recharge la partie Profil
+        super().from_dict(profil_data)
+
+        # Recharge les champs spécifiques Trajectoire
+        self.max_acceleration = traj_data.get('max_acceleration', self.max_acceleration)
+        self.max_velocity = traj_data.get('max_velocity', self.max_velocity)
+        self.velocities = traj_data.get('velocities', [])
+        self.lap_time = traj_data.get('lap_time', 0.0)
+        self.ecarts = traj_data.get('ecarts', [])
 
     def calculate_velocities(self):
         """Calcule les vitesses maximales selon les courbures de la trajectoire"""

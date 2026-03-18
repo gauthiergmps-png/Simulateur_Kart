@@ -20,23 +20,22 @@ V1.1: J'ajoute les boutons RECORD, REPLAY, READ pour soit enregistrer un pilotag
 
 Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 000 runs, c'est très disymétrique, à exploiter donc.
 
-V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet
+V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet, et je produit un fichier
+       traj_1.json qui me permet d'avoir une trajectoire cible, à exploiter dans SimulUI.
 
 # TODO
-Agent:
+
+SimulUI:
+Charger une trajectoire (traj_1.json) cible et calculer une fonction écat
+Ajouter un choix d'agents de controle, Q_Learning, DQ_Learning,... qui utiliseront les résultats de chaque étape.
+
+Agent q_learning:
 Symétriser la matrice Q pour exploiter la symétrie du problème
 voir l'état du epsilon quand je relance un Qlearning
 
-SimulUI:
-Ajouter un choix d'agents de controle, Q_Learning, DQ_Learning,... qui utiliseront les résultats de chaque étape.
-Choisir une trajectoire
+
+# EVOLUTIONS FONCTIONNELLES A FAIRE ... PEUT ETRE
 Faire une syntaxe lisible dans commandes. txt, avec que des tuples (x,y,y) et des commentaires # et des commandes "repeat N"
-
-Circuits&trajectoires:
-sauvegarder les trajectoires avec vecteurs normaux, et fonction "écart position" du kart
-
-
-# EVOLUTIONS FONCTIONNELLES A FAIRE
 
 Faire marcher un RL à vitesse constante sur un circuit donnée
 

@@ -277,20 +277,30 @@ class Profil:
         
     def to_dict(self):
         """Convertit le profil en dictionnaire pour sauvegarde"""
+        def _jsonify(v):
+            """Convertit un élément numpy (ndarray / np.float) en type sérialisable JSON."""
+            if isinstance(v, np.ndarray):
+                return v.tolist()
+            # np.float64 / np.int64 ne sont pas toujours acceptés par json
+            if isinstance(v, (np.floating, np.integer)):
+                return v.item()
+            return v
+
         data = {
             'name': self.name, 
             'is_closed': self.is_closed,
-            'n_fine_points': self.n_fine_points,
             'raw_points': self.raw_points,
+
+            'n_fine_points': self.n_fine_points,
             'fine_points': self.fine_points.tolist() if len(self.fine_points) > 0 else [],
             'parameters': {}
         }
         parameters = {
-            'tangents': self.tangents,
-            'normals': self.normals,
-            'curvatures': self.curvatures,
-            'distances': self.distances,
-            'length': self.length
+            'tangents': [_jsonify(t) for t in self.tangents],
+            'normals': [_jsonify(n) for n in self.normals],
+            'curvatures': [_jsonify(c) for c in self.curvatures],
+            'distances': [_jsonify(d) for d in self.distances],
+            'length': _jsonify(self.length),
         }
         data['parameters'] = parameters
         return data

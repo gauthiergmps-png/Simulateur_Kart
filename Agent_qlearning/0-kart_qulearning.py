@@ -238,7 +238,6 @@ def play_one_game(bins, Q, eps=0.5, verbose=False, record=False):
 
     return total_reward, cnt
 
-
 def save_last_commandes(Q, commandes, initial_state):
     """Appelé à la fin d'une séquence d'apprentissage: Enregistre dans le dossier Records/ le dernier état de Q 
 	ainsi que la séquence de commandes du dernier run.
