@@ -17,7 +17,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from C_et_T.C_et_T_classes.circuit_et_trajectoire import Circuit, Trajectoire
 from C_et_T.C_et_T_classes.image_background import ImageBackgroundManager
-from C_et_T.C_et_T_classes.file_manager import FileManager
 
 class CircuitSimulator:
     def __init__(self, root):
@@ -31,8 +30,7 @@ class CircuitSimulator:
         # Variables trajectoire - maintenant utilisant la classe Trajectoire
         self.trajectory = Trajectoire("Trajectoire", is_closed=True)
         
-        # Gestionnaire de fichiers
-        self.file_manager = FileManager()
+        # Gestionnaire de fichiers: supprimé (sauvegarde/chargement via Circuit et Trajectoire)
         
         # Variables graphiques
         self.zoom_level = 1.0            # Niveau de zoom
@@ -517,29 +515,29 @@ class CircuitSimulator:
         self.circuit_info_label.config(text="Nouveau circuit créé")
         
     def save_circuit(self):
-        """Sauvegarde le circuit en utilisant le FileManager"""
+        """Sauvegarde le circuit (Circuit dialog JSON/CSV)."""
         if self.circuit.input_mode:
             messagebox.showerror("Erreur", "Le circuit est en mode saisie")
             return
-        if self.file_manager.save_circuit(self.circuit):
+        if self.circuit.save_circuit_dialog():
             self.circuit_info_label.config(text=f"Circuit sauvegardé")
 
     def save_trajectory(self):
-        """Sauvegarde la trajectoire en utilisant le FileManager"""
-        if self.file_manager.save_trajectory(self.trajectory):
+        """Sauvegarde la trajectoire (Trajectoire dialog JSON/CSV)."""
+        if self.trajectory.save_trajectory_dialog():
             self.trajectory_info_label.config(text=f"Trajectoire sauvegardée")
                 
     def load_trajectory(self):
-        """Charge la trajectoire en utilisant le FileManager"""
-        new_traj = self.file_manager.load_trajectory()
+        """Charge la trajectoire en utilisant Trajectoire dialog."""
+        new_traj = Trajectoire.load_trajectory_dialog()
         if new_traj:
             self.trajectory = new_traj
             self.update_plot(False)
             self.trajectory_info_label.config(text="Trajectoire chargée")
                 
     def load_circuit(self):
-        """Charge un circuit en utilisant le FileManager"""
-        new_circuit = self.file_manager.load_circuit()
+        """Charge un circuit en utilisant Circuit dialog."""
+        new_circuit = Circuit.load_circuit_dialog()
         if new_circuit:
             self.circuit = new_circuit
             self.width_var.set(self.circuit.width)

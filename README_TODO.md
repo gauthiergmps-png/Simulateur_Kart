@@ -21,12 +21,14 @@ V1.1: J'ajoute les boutons RECORD, REPLAY, READ pour soit enregistrer un pilotag
 Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 000 runs, c'est très disymétrique, à exploiter donc.
 
 V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet, et je produit un fichier
-       traj_1.json qui me permet d'avoir une trajectoire cible, à exploiter dans SimulUI.
+       traj_1.json qui me permettra d'avoir une trajectoire cible
+       
+V1.2.1: Traj cible visualisée dans SimulUI.
 
 # TODO
 
 SimulUI:
-Charger une trajectoire (traj_1.json) cible et calculer une fonction écat
+Faire marcher la fonction idx et écart
 Ajouter un choix d'agents de controle, Q_Learning, DQ_Learning,... qui utiliseront les résultats de chaque étape.
 
 Agent q_learning:

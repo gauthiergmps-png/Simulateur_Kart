@@ -9,6 +9,8 @@ V0.5: J'ai demandé de definir une super classe profil, et deux sous-classe circ
 V1.2 - Mars 2026: Importation dans le projet Kart Simulator, donc n° Version global.
        J'ai produit un fichier traj_1.json, qui me suffira pour l'instant pour travailler sur SimulUI.
 
+Je supprime la classe File_manager pour avoir les méthodes load et save directement dans les classes Circuit et Trajectoire
+
 # TODOs
 
 Visualiser le starting point et prévoir de recaler dans le repère absolu de mon choix

@@ -1,2 +1,3 @@
 Ne jamais supprimer les commentaires existants, ajouter un flag OBSOLETE ou A METTRE A JOUR si nécessaire
 Ne jamais modifier l'aspect ou le style de mise en forme du code existant si la fonction est inchangée
+Ne se servir de messagebox uniquement pour afficher des messages d'erreur

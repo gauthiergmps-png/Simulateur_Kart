@@ -1,11 +1,44 @@
 from .profil import Profil
 import numpy as np
+import json
+import os
+import csv
+from pathlib import Path
+from tkinter import filedialog, messagebox
 
 """ Ce fichier contient les deux classes principales: Circuit et Trajectoire, qui héritent de la classe Profil.
 
     Et une fonction d'optimisation de la vitesse
 
 """
+
+
+DIR_FILES = "C_et_T_files"
+
+
+def _dir_files_path() -> Path:
+    """Retourne le dossier de travail pour les fichiers (toujours DIR_FILES)."""
+    base_dir = Path(__file__).resolve().parent.parent  # .../C_et_T
+    p = base_dir / DIR_FILES
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _is_within_dir_files(filepath: str) -> bool:
+    """Vrai si filepath est dans DIR_FILES (après résolution)."""
+    try:
+        file_path = Path(filepath).resolve()
+        dir_path = _dir_files_path().resolve()
+        file_path.relative_to(dir_path)
+        return True
+    except Exception:
+        return False
+
+
+def _force_into_dir_files(filepath: str) -> str:
+    """Force un chemin vers DIR_FILES en gardant uniquement le basename."""
+    filename = os.path.basename(filepath)
+    return str(_dir_files_path() / filename)
 
 
 class Circuit(Profil):
@@ -115,6 +148,112 @@ class Circuit(Profil):
             self.width = circuit_data.get('width', self.width)
             self.left_border = circuit_data.get('left_border', [])
             self.right_border = circuit_data.get('right_border', [])
+
+    def _save_circuit_csv(self, filename):
+        """Sauvegarde CSV (actuellement non implémentée)."""
+        messagebox.showerror("Erreur", "Module à coder ")
+        return False
+
+    def _save_circuit_json(self, filename):
+        """Sauvegarde JSON en utilisant uniquement circuit.to_dict()."""
+        data = self.to_dict()
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def save_circuit_dialog(self):
+        """Ouvre une boite de dialogue et sauvegarde le circuit (.csv ou .json)."""
+        if len(self.raw_points) == 0:
+            messagebox.showerror("Erreur", "Aucun circuit à sauvegarder")
+            return False
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            initialdir=str(_dir_files_path()),
+            filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")]
+        )
+
+        if not filename:
+            return False
+
+        filename = _force_into_dir_files(filename)
+
+        try:
+            if filename.lower().endswith('.json'):
+                self._save_circuit_json(filename)
+            elif filename.lower().endswith('.csv'):
+                self._save_circuit_csv(filename)
+            else:
+                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .csv ou .json).")
+                return False
+            return True
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
+            return False
+
+    @classmethod
+    def load_circuit_dialog(cls):
+        """Ouvre une boite de dialogue et charge un circuit (.csv ou .json)."""
+        filename = filedialog.askopenfilename(
+            initialdir=str(_dir_files_path()),
+            filetypes=[("All files", "*.*")]
+        )
+
+        if not filename:
+            return None
+
+        if not _is_within_dir_files(filename):
+            messagebox.showerror("Erreur", f"Lecture interdite hors de '{DIR_FILES}'.")
+            return None
+
+        try:
+            new_circuit = cls()
+            if filename.endswith('.csv'):
+                cls._load_circuit_csv(new_circuit, filename)
+            elif filename.endswith('.json'):
+                with open(filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                new_circuit.from_dict(data)
+            else:
+                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .csv ou .json).")
+                return None
+            return new_circuit
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
+            return None
+
+    @staticmethod
+    def _load_circuit_csv(circuit, filename):
+        """Charge un circuit depuis un fichier CSV."""
+        circuit.raw_points = []
+
+        with open(filename, 'r', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+
+            # Lire les métadonnées
+            for row in reader:
+                if not row or not row[0].startswith('#'):
+                    break
+                if row[0].startswith('# Width:'):
+                    circuit.width = float(row[1])
+                elif row[0].startswith('# Closed:'):
+                    circuit.is_closed = row[1].lower() == 'true'
+
+            # Chercher la ligne d'en-tête des colonnes
+            for row in reader:
+                if row and len(row) >= 4 and row[0] == 'Point_Index':
+                    break
+
+            # Lire les points bruts
+            for row in reader:
+                if not row or len(row) < 4:
+                    break
+                if row[3] == 'Raw':
+                    try:
+                        x = float(row[1])
+                        y = float(row[2])
+                        circuit.raw_points.append([x, y])
+                    except ValueError:
+                        continue
 
 
 
@@ -270,6 +409,76 @@ class Trajectoire(Profil):
         self.velocities = traj_data.get('velocities', [])
         self.lap_time = traj_data.get('lap_time', 0.0)
         self.ecarts = traj_data.get('ecarts', [])
+
+    def _save_trajectory_csv(self, filename):
+        """Sauvegarde CSV (actuellement non implémentée)."""
+        messagebox.showerror("Erreur", "Module à coder ")
+        return False
+
+    def _save_trajectory_json(self, filename):
+        """Sauvegarde JSON en utilisant uniquement trajectory.to_dict()."""
+        data = self.to_dict()
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def save_trajectory_dialog(self):
+        """Ouvre une boite de dialogue et sauvegarde la trajectoire (.csv ou .json)."""
+        if len(self.fine_points) == 0:
+            messagebox.showerror("Erreur", "Aucune trajectoire à exporter")
+            return False
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            initialdir=str(_dir_files_path()),
+            filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")]
+        )
+
+        if not filename:
+            return False
+
+        filename = _force_into_dir_files(filename)
+
+        try:
+            if filename.lower().endswith('.json'):
+                self._save_trajectory_json(filename)
+            elif filename.lower().endswith('.csv'):
+                self._save_trajectory_csv(filename)
+            else:
+                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .csv ou .json).")
+                return False
+            return True
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l'export: {e}")
+            return False
+
+    @classmethod
+    def load_trajectory_dialog(cls):
+        """Ouvre une boite de dialogue et charge une trajectoire (.json uniquement)."""
+        filename = filedialog.askopenfilename(
+            initialdir=str(_dir_files_path()),
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+
+        if not filename:
+            return None
+
+        if not _is_within_dir_files(filename):
+            messagebox.showerror("Erreur", f"Lecture interdite hors de '{DIR_FILES}'.")
+            return None
+
+        try:
+            new_traj = cls()
+            if filename.lower().endswith('.json'):
+                with open(filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                new_traj.from_dict(data)
+                return new_traj
+            else:
+                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .json).")
+                return None
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
+            return None
 
     def calculate_velocities(self):
         """Calcule les vitesses maximales selon les courbures de la trajectoire"""

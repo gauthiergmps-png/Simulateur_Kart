@@ -106,13 +106,12 @@ class User_Interface:
         
         # Frame 2B - Boutons RECORD, STOP, REPLAY
         self._create_recorder_buttons_frame(frames['frame2B'])
+
+        # Frame 3 - Circuit et Trajectoire cible
+        self._create_circuits_frame(frames['frame3'])
         
-        # Frame 3 - Volant et hauteur CdG
-        self._create_steering_frame(frames['frame3'])
-
-        # Frame 4 - Espace réservé pour contrôles futurs
-        self._create_circuits_frame(frames['frame4'])
-
+        # Frame 4 - Volant et hauteur CdG
+        self._create_steering_frame(frames['frame4'])
 
         # Frame 5 - Régulateur et asservissement
         self._create_regulator_frame(frames['frame5'])
@@ -183,7 +182,13 @@ class User_Interface:
         self.btn_replay = Button(frame, text="REPLAY", fg="red", command=self._handle_replay, state="disabled")
         self.btn_replay.pack(padx=10, pady=5, anchor=CENTER)
         Button(frame, text="READ", fg="black", command=self.read_commands).pack(padx=10, pady=5, anchor=CENTER)
-        
+
+    def _create_circuits_frame(self, frame):
+        """Crée le frame des commandes"""
+        Label(frame, text="""Circuit:""", justify=LEFT, padx=20).pack()
+        Button(frame, text="Load Trajectoire", fg="blue", command=self._handle_load_traj).pack(padx=10, pady=5, anchor=CENTER)
+        self.circuit.set(0)
+     
     def _create_steering_frame(self, frame):
         """Crée le frame de contrôle du volant et hauteur CdG"""
         self.volant_curseur = Scale(frame, from_=-45, to=45, length=200, 
@@ -195,17 +200,7 @@ class User_Interface:
                           label="H CdG en %", orient=HORIZONTAL)
         self.H_cdg.set(0)
         self.H_cdg.pack()
-    
-    def _create_circuits_frame(self, frame):
-        """Crée le frame des commandes"""
-        Label(frame, text="""Circuit:""", justify=LEFT, padx=20).pack()
-        Radiobutton(frame, text="Damier", padx=20, variable=self.circuit, value=0).pack(anchor=W)
-        Radiobutton(frame, text="Y axis", padx=20, variable=self.circuit, value=1).pack(anchor=W)
-        Radiobutton(frame, text="Circuit 2", padx=20, variable=self.circuit, value=2).pack(anchor=W)
-        Radiobutton(frame, text="Circuit 3", padx=20, variable=self.circuit, value=3).pack(anchor=W)
-        Radiobutton(frame, text="Circuit 4", padx=20, variable=self.circuit, value=4).pack(anchor=W)
-        self.circuit.set(0)
-    
+
     def _create_regulator_frame(self, frame):
         """Crée le frame du régulateur de vitesse"""
         
@@ -265,7 +260,6 @@ class User_Interface:
         self.cnv.focus_get()
         self.cnv.focus_force()
  
-    
     def press_key(self, event): 
         """Gère les pressions de touches"""
         # Cette méthode doit être surchargée par la classe qui utilise UI
@@ -297,7 +291,12 @@ class User_Interface:
         """
         self.record_status = False
         self.btn_record.config(text="RECORD")  # reste disabled jusqu'au prochain reset
-    
+
+    def _handle_load_traj(self):
+        """Gère l'action de chargement de la trajectoire cible
+        Sera chargé dans la classe SimulationUI"""
+        pass
+
     def _handle_replay(self):
         """Gère l'action de pause - appelle la méthode surchargée"""
         self.record_replay()
@@ -313,8 +312,8 @@ class User_Interface:
         """Lit un fichier de commandes et remplit self.controls_recorded (et éventuels paramètres associés)."""
         pass
     
-    def update_telemetry(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com,
-                         pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, gaz, vold,
+    def show_telemetry(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com,
+                         pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, gaz, vold, idx,ecart,
                          f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg, radius, varbre, vstab):
         """Met à jour l'affichage de télémesure.
 
@@ -327,7 +326,8 @@ class User_Interface:
             f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "
             f"F_com = {F_com:5d}  X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Z = {pos_z:6.2f} "
             f"Vx = {vit_x:6.2f}  Vy = {vit_y:6.2f}   Lacet = {lacet_deg:6.2f} "
-            f"V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f}"
+            f"V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f} "
+            f"Idx = {idx:5d} Ecart = {ecart:6.2f}"
         )
         self.telemesure1.config(text=str(texteaff))
 

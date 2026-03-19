@@ -1,28 +1,24 @@
 import json
+import sys
 import numpy as np
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
-from classes.kart import Kart
-from .utils import vehicule2piste, piste2vehicule, norme_vecteur
 
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+RECORDS_DIR = PROJECT_DIR / "Records"
+sys.path.insert(0, str(PROJECT_DIR))
+from classes.kart import Kart
+from classes.user_interface import User_Interface
+from classes.utils import vehicule2piste, piste2vehicule, norme_vecteur
+from C_et_T.C_et_T_classes.circuit_et_trajectoire import Circuit, Trajectoire
+
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .kart import Kart
 
-RECORDS_DIR = Path(__file__).resolve().parent.parent / "Records"
-
-try:
-    from .user_interface import User_Interface
-    from .utils import vehicule2piste, norme_vecteur
-except ImportError:
-    from user_interface import User_Interface
-    from kart import Kart
-    from utils import vehicule2piste, norme_vecteur
-
-
 class SimulationCore:
     """Cœur d'une simulation dynamique du Kart, sans UI.
-       recoit des commandes de type controle et paramètres du kart ou de la simulation,
+       recoit des commandes de type controle et paramètres du kart d'un environnement extérieur
        et propage l'état du kart.
        Pour l'instant on va se servir dans les variables de l'instance Kart pour les observables qu'on veut, à fignoler
     """
@@ -34,6 +30,8 @@ class SimulationCore:
         self.regul=False
         self.vold = 0.
         self.reset()
+        self.trajectoire = None
+        self.last_index_traj=0
     
     def reset(self):
         """Initialise l'état interne de la simulation."""
@@ -108,6 +106,38 @@ class SimulationCore:
             'volant': volant,
         }
 
+    def load_trajectoire_from_json(self):
+        """Ouvre le dialogue de chargement (Tk) et affecte la trajectoire chargée à ``self.trajectoire``.
+
+        Annulation du dialogue ou erreur : ``self.trajectoire`` n'est pas modifié.
+        """
+        new_traj = Trajectoire.load_trajectory_dialog()
+        if new_traj is not None:
+            self.trajectoire = new_traj
+            self.last_index_traj=0
+    
+    def ecart_trajectoire(self):
+        """Calcule l'écart entre la position actuelle du Kart et la trajectoire cible
+        """
+        if self.trajectoire is None:
+            return 0.
+
+        # depuis le dernier appel, le kart a du avancer, identifions le nouvel index du point fin le plus proche du kart
+        idx=self.last_index_traj
+        dist_last =np.linalg.norm(self.trajectoire.fine_points[idx] - self.kart.position[0:1])
+        dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - self.kart.position[0:1])
+        while dist_last > dist_next:
+            idx+=1
+            dist_last=dist_next
+            dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - self.kart.position[0:1])
+        self.last_index_traj=idx
+
+        # maintenant calculons l'écart comme étant la projection point kart sur le vecteur normal à la trajectoire
+        vect_pt_kart=self.kart.position[0:1] - self.trajectoire.fine_points[idx]
+        normal=self.trajectoire.normals[idx]
+        ecart=np.dot(vect_pt_kart, normal)
+            
+        return ecart
 
 class SimulationUI(User_Interface):
     """Classe gérant la simulation manuelle avec interfaces utilisateurs Via Tkinter.
@@ -222,11 +252,8 @@ class SimulationUI(User_Interface):
     
     def profil_circuit(self, x_cdg, y_cdg):
         """Retourne un profil complet du circuit en coordonnées absolues
-        sous forme d'une liste d'élements comprend:
-        (x, y) position du point
-        (nx, ny) vecteur unitaire normal à la trajectoire orienté vers la gauche de la trajectoire
-        curvature: courbure de la trajectoire en chaque point
-        
+           Ne sert en fait qu'avec type_circuit = 0: quadrillage 10 x 10 autour du kart
+           la trajectoire cible sera affichée par une autre fonction        
         """
         def profil_segment(P0, P2):
             L = np.linalg.norm(P2 - P0)
@@ -319,6 +346,11 @@ class SimulationUI(User_Interface):
 
         return list(X[:, 0]), list(X[:, 1])
     
+    def _handle_load_traj(self):
+        """Gère l'action de chargement de la trajectoire cible
+        Sera chargé dans la classe SimulationUI"""
+        self.core.load_trajectoire_from_json()
+    
     def dessin_canvas(self,kc):
         """Fonction de dessin du canvas à chaque pas"""
         # on efface tout, et on calcule l'origine d'affichage
@@ -340,6 +372,16 @@ class SimulationUI(User_Interface):
         for i in range(0, len(x)):
             circuit += [abs2canvas(x[i], y[i], origx, origy)]
         self.cnv.create_polygon(circuit, outline='black', fill='', width=2)
+
+        # CALCUL ET TRACE DE LA TRAJECTOIRE CIBLE
+        if self.core.trajectoire is not None:
+            fp = np.asarray(self.core.trajectoire.fine_points, dtype=float)
+            # `fine_points` est attendu sous forme (N, 2). Si ce n'est pas le cas,
+            # on évite de planter et on ne dessine rien.
+            if fp.ndim == 2 and fp.shape[1] >= 2 and len(fp) >= 2:
+                trajectoire = [abs2canvas(fp[i, 0], fp[i, 1], origx, origy) for i in range(len(fp))]
+                # Tkinter Canvas attend des points (x,y) séparés en arguments, ou une liste aplatie.
+                self.cnv.create_line(*trajectoire, fill='red', width=2)
         
         # CALCUL ET TRACE DU KART
         x, y = self.kart.profil_absolu
@@ -521,6 +563,37 @@ class SimulationUI(User_Interface):
             if position is not None or vitesse is not None or angles is not None or vitangul is not None:
                 self.kart.init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
     
+    def update_telemetry(self, V, F_com):
+        """ Tous les calculs numériques sont faits ici, avant l'appel à show_telemetry de la classe User_Interface
+        """
+
+        f_cdg_vec = piste2vehicule(self.kart.force_cdg, self.kart.angles[0])
+        norme_f_cdg = norme_vecteur(f_cdg_vec)
+
+        # calcul du rayon de courbure de la trajectoire du kart à partir de la force appliquée au cdg
+        radius = ( 1000000000.0 if norme_f_cdg < 0.00001 else self.kart.masse * V * V / norme_f_cdg)
+
+        t_cyclemax_ms = int(self.t_cyclemax * 1000)
+        t_framemax_ms = int(self.t_framemax * 1000)
+
+        pos_x, pos_y, pos_z = self.kart.position
+        vit_x, vit_y, _ = self.kart.vitesse
+        lacet_deg = self.kart.angles[0] * 180.0 / np.pi
+        V_kmh = V * 3.6
+        f_cdg_x, f_cdg_y, f_cdg_z = f_cdg_vec
+        moment_cdg_z = self.kart.moment_cdg[2]
+
+        vold=self.core.vold
+        idx=self.core.last_index_traj
+        ecart=self.core.ecart_trajectoire()
+
+        varbre = self.kart.v_arbre
+        vstab = float(np.dot(f_cdg_vec, vehicule2piste(self.kart.vitesse, self.kart.angles[0])))
+
+        self.show_telemetry(self.core.pas_simul, self.core.temps, t_cyclemax_ms, t_framemax_ms, F_com,
+                              pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, self.gaz, vold, idx, ecart,
+                              f_cdg_x, f_cdg_y, f_cdg_z, norme_f_cdg, moment_cdg_z, radius, varbre, vstab)    
+
     def animation_step(self):
         """Effectue une étape d'animation (UI + core)
         Ne pas confondre une étape d'animation (L'affichage a lieu et se rafraichi, index N augmente
@@ -588,31 +661,9 @@ class SimulationUI(User_Interface):
         self.dessin_canvas(self.echelle_dyn.get())
         
         # Mise à jour télémesures
-        # Tous les calculs numériques sont faits ici, avant l'appel à update_telemetry
-        f_cdg_vec = piste2vehicule(self.kart.force_cdg, self.kart.angles[0])
-        force_cdg = norme_vecteur(f_cdg_vec)
-        norme_f_cdg = norme_vecteur(f_cdg_vec)
-        radius = (
-            1000000000.0
-            if norme_f_cdg < 0.00001
-            else self.kart.masse * V * V / norme_f_cdg
-        )
-        t_cyclemax_ms = int(self.t_cyclemax * 1000)
-        t_framemax_ms = int(self.t_framemax * 1000)
-        pos_x, pos_y, pos_z = self.kart.position
-        vit_x, vit_y, _ = self.kart.vitesse
-        lacet_deg = self.kart.angles[0] * 180.0 / np.pi
-        V_kmh = V * 3.6
-        f_cdg_x, f_cdg_y, f_cdg_z = f_cdg_vec
-        moment_cdg_z = self.kart.moment_cdg[2]
-        varbre = self.kart.v_arbre
-        vstab = float(np.dot(f_cdg_vec, vehicule2piste(self.kart.vitesse, self.kart.angles[0])))
+        self.update_telemetry(V, F_com)      
 
         # Temps de cycle max = temps réel d'une frame (step + caméra + dessin + télémesure), en secondes
-        self.update_telemetry(self.core.pas_simul, self.core.temps, t_cyclemax_ms, t_framemax_ms, F_com,
-                              pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, self.gaz, self.core.vold,
-                              f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg_z, radius, varbre, vstab)
-
         t_frame = time.time() - t0_frame
         if not self.simul_pause and self.core.temps > 1.:
             self.t_framemax = max(t_frame, self.t_framemax)
