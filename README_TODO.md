@@ -23,13 +23,14 @@ Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 00
 V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet, et je produit un fichier
        traj_1.json qui me permettra d'avoir une trajectoire cible
        
-V1.2.1: Traj cible visualisée dans SimulUI.
+V1.2.1: Trajectoire cible visualisée dans SimulUI et fonction ecart position kart disponible
 
 # TODO
 
 SimulUI:
-Faire marcher la fonction idx et écart
-Ajouter un choix d'agents de controle, Q_Learning, DQ_Learning,... qui utiliseront les résultats de chaque étape.
+Ajouter un choix d'agents de controle, proportionel, Q_Learning, DQ_Learning,..
+Agent proportionnel:
+Calculer volant = écart - lambda(V) Vy simplement
 
 Agent q_learning:
 Symétriser la matrice Q pour exploiter la symétrie du problème

@@ -122,18 +122,27 @@ class SimulationCore:
         if self.trajectoire is None:
             return 0.
 
+        pos_xy = self.kart.position[0:2]  # on ne garde donc que 2 coordonnées dans le vecteur pos_xy
+
         # depuis le dernier appel, le kart a du avancer, identifions le nouvel index du point fin le plus proche du kart
-        idx=self.last_index_traj
-        dist_last =np.linalg.norm(self.trajectoire.fine_points[idx] - self.kart.position[0:1])
-        dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - self.kart.position[0:1])
-        while dist_last > dist_next:
-            idx+=1
-            dist_last=dist_next
-            dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - self.kart.position[0:1])
+        # idx=self.last_index_traj
+        # dist_last =np.linalg.norm(self.trajectoire.fine_points[idx] - pos_xy)
+        # dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - pos_xy)
+        # while dist_last > dist_next:
+        #     idx+=1
+        #     dist_last=dist_next
+        #     dist_next=np.linalg.norm(self.trajectoire.fine_points[idx+1] - pos_xy)
+        d_min=10000000
+        idx=0
+        for i in range(len(self.trajectoire.fine_points)):
+            d=np.linalg.norm(self.trajectoire.fine_points[i] - pos_xy)
+            if d < d_min:
+                d_min=d
+                idx=i
         self.last_index_traj=idx
 
         # maintenant calculons l'écart comme étant la projection point kart sur le vecteur normal à la trajectoire
-        vect_pt_kart=self.kart.position[0:1] - self.trajectoire.fine_points[idx]
+        vect_pt_kart=pos_xy - self.trajectoire.fine_points[idx]
         normal=self.trajectoire.normals[idx]
         ecart=np.dot(vect_pt_kart, normal)
             
@@ -345,7 +354,7 @@ class SimulationUI(User_Interface):
             raise ValueError(f"Type de circuit non valide: {type}")
 
         return list(X[:, 0]), list(X[:, 1])
-    
+
     def _handle_load_traj(self):
         """Gère l'action de chargement de la trajectoire cible
         Sera chargé dans la classe SimulationUI"""
@@ -368,12 +377,10 @@ class SimulationUI(User_Interface):
         
         # CALCUL ET TRACE DU CIRCUIT OU FOND DE PISTE
         x, y = self.profil_circuit(xcdg, ycdg)
-        circuit = []
-        for i in range(0, len(x)):
-            circuit += [abs2canvas(x[i], y[i], origx, origy)]
+        circuit = [abs2canvas(x[i], y[i], origx, origy) for i in range(len(x))]
         self.cnv.create_polygon(circuit, outline='black', fill='', width=2)
 
-        # CALCUL ET TRACE DE LA TRAJECTOIRE CIBLE
+        # TRACE DE LA TRAJECTOIRE CIBLE
         if self.core.trajectoire is not None:
             fp = np.asarray(self.core.trajectoire.fine_points, dtype=float)
             # `fine_points` est attendu sous forme (N, 2). Si ce n'est pas le cas,
@@ -383,6 +390,14 @@ class SimulationUI(User_Interface):
                 # Tkinter Canvas attend des points (x,y) séparés en arguments, ou une liste aplatie.
                 self.cnv.create_line(*trajectoire, fill='red', width=2)
         
+            # trace de la flèche "normale" à la trajectoire
+            # pt_start = self.core.trajectoire.fine_points[self.core.last_index_traj]
+            # traj_normal = self.core.trajectoire.normals[self.core.last_index_traj]
+            # pt_end = pt_start + traj_normal
+            # self.cnv.create_line(abs2canvas(pt_start[0], pt_start[1], origx, origy),
+            #                 abs2canvas(pt_end[0], pt_end[1], origx, origy),
+            #                 width=3, fill="blue", arrow="last", arrowshape=(18, 20, 3))
+        
         # CALCUL ET TRACE DU KART
         x, y = self.kart.profil_absolu
         
@@ -390,9 +405,7 @@ class SimulationUI(User_Interface):
         couleurs = ['black', 'blue', 'orange', 'red', 'yellow']
         coul_roue = couleurs[:]
         
-        chassis = []
-        for i in range(0, 4):
-            chassis += [abs2canvas(x[i], y[i], origx, origy)]
+        chassis = [abs2canvas(x[i], y[i], origx, origy) for i in range(4)]
         self.cnv.create_polygon(chassis, outline='black', fill=couleurs[self.kart.coul_chassis], width=1)
         
         coul_roue[1] = couleurs[self.kart.gavg]
