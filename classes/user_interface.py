@@ -5,6 +5,8 @@ from tkinter import (Tk, Canvas, Frame, Button, LEFT, RIGHT, TOP, BOTTOM,
                      CENTER, HORIZONTAL, VERTICAL, ARC, LAST, Label, Scale,
                      Checkbutton, Radiobutton, IntVar, W, N, S)
 
+from classes.kart_control import Kart_control
+
 class User_Interface:
     """Classe gérant l'interface utilisateur Tkinter du simulateur de kart
        A noter que cette classe ne connait pas encore le Kart, qui sera instancié
@@ -22,6 +24,7 @@ class User_Interface:
         self.cnv = None
         self.telemesure1 = None
         self.telemesure2 = None
+        self.telemesure3 = None
         
         # Variables de contrôle
         self.volant_curseur = None
@@ -32,10 +35,10 @@ class User_Interface:
         
         # Variables d'état (initialisées après création de la fenêtre)
         self.commandes = None
+        self.command_radiobuttons = []
         self.circuit = 0
         self.methode = None
         self.regul = None
-        self.ass_d = None
         self.transm = None
         
         # Variables de simulation
@@ -72,7 +75,6 @@ class User_Interface:
         self.circuit = IntVar()
         self.methode = IntVar()
         self.regul = IntVar()
-        self.ass_d = IntVar()
         self.transm = IntVar()
         
         # Bandeau principal
@@ -116,8 +118,8 @@ class User_Interface:
         # Frame 5 - Régulateur et asservissement
         self._create_regulator_frame(frames['frame5'])
         
-        # Frame 6 - Asservissement dynamique
-        self._create_dynamic_control_frame(frames['frame6'])
+        # Frame 6 - LIBRE 
+        # self._create_dynamic_control_frame(frames['frame6'])
         
         # Frame 7 - Ouverture et transmission
         self._create_transmission_frame(frames['frame7'])
@@ -129,12 +131,13 @@ class User_Interface:
         self._create_telemetry_zone()
     
     def _create_command_frame(self, frame):
-        """Crée le frame des commandes"""
+        """Crée le frame des commandes (libellés fournis par Kart_control.list_available_controls)."""
         Label(frame, text="""Commandes:""", justify=LEFT, padx=20).pack()
-        Radiobutton(frame, text="Clavier", padx=20, variable=self.commandes, value=0).pack(anchor=W)
-        Radiobutton(frame, text="W Fichier", padx=20, variable=self.commandes, value=1).pack(anchor=W)
-        Radiobutton(frame, text="R Fichier", padx=20, variable=self.commandes, value=2).pack(anchor=W)
-        Radiobutton(frame, text="Reset", padx=20, variable=self.commandes, value=3).pack(anchor=W)
+        self.command_radiobuttons = []
+        for value, text in Kart_control.list_available_controls():
+            rb = Radiobutton(frame, text=text, padx=20, variable=self.commandes, value=value)
+            rb.pack(anchor=W)
+            self.command_radiobuttons.append(rb)
         self.commandes.set(0)
     
     def _create_propagation_frame(self, frame):
@@ -207,26 +210,15 @@ class User_Interface:
         Checkbutton(frame, text="Regulateur de vitesse", padx=20, variable=self.regul,
                    onvalue=1, offvalue=0).pack(anchor=W)
         
-        self.ass_d = IntVar()
-        Checkbutton(frame, text="Asserv. d", padx=20, variable=self.ass_d,
-                   onvalue=1, offvalue=0).pack(anchor=W)
-        
-        self.ass_d0 = Scale(frame, from_=-2, to=2, resolution=0.1, length=100, 
-                           label="V_lacet cible", orient=HORIZONTAL)
-        self.ass_d0.set(0)
-        self.ass_d0.pack()
-        
-        self.ass_dgain_stat = Scale(frame, from_=0, to=5, resolution=0.1, length=100, 
+        self.ass_gain_stat = Scale(frame, from_=0, to=50, resolution=1, length=100, 
                                    label="Gain Statique", orient=HORIZONTAL)
-        self.ass_dgain_stat.set(2.5)
-        self.ass_dgain_stat.pack()
-    
-    def _create_dynamic_control_frame(self, frame):
-        """Crée le frame de contrôle dynamique"""
-        self.ass_dgain_dyn = Scale(frame, from_=0, to=5, resolution=0.1, length=100, 
+        self.ass_gain_stat.set(12)
+        self.ass_gain_stat.pack()
+
+        self.ass_gain_dyn = Scale(frame, from_=0, to=100, resolution=1, length=100, 
                                   label="Gain Dynamique", orient=HORIZONTAL)
-        self.ass_dgain_dyn.set(2.5)
-        self.ass_dgain_dyn.pack()
+        self.ass_gain_dyn.set(12)
+        self.ass_gain_dyn.pack()
     
     def _create_transmission_frame(self, frame):
         """Crée le frame de transmission"""
@@ -246,6 +238,8 @@ class User_Interface:
         self.telemesure1.pack()
         self.telemesure2 = Label(self.fenetre, fg="green")
         self.telemesure2.pack()
+        self.telemesure3 = Label(self.fenetre, fg="red")
+        self.telemesure3.pack()
     
     def _create_canvas(self):
         """Crée le canvas d'animation"""
@@ -312,33 +306,45 @@ class User_Interface:
         """Lit un fichier de commandes et remplit self.controls_recorded (et éventuels paramètres associés)."""
         pass
     
-    def show_telemetry(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com,
-                         pos_x, pos_y, pos_z, vit_x, vit_y, lacet_deg, V, V_kmh, gaz, vold, idx,ecart,
-                         f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg, radius, varbre, vstab):
-        """Met à jour l'affichage de télémesure.
+    def show_telemetry_1(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com):
+        """Met à jour l'affichage de télémesure ligne 1.
 
         Tous les calculs numériques doivent être faits en amont :
         cette fonction se contente d'afficher les valeurs passées en arguments.
         """
         # Télémesure 1 (affichage direct des arguments formatés)
-        texteaff = (
+        texteaff = ("SIMULATION "
             f"N= {pas_simul:10}  T = {temps:6.2f}  "
             f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "
-            f"F_com = {F_com:5d}  X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Z = {pos_z:6.2f} "
-            f"Vx = {vit_x:6.2f}  Vy = {vit_y:6.2f}   Lacet = {lacet_deg:6.2f} "
-            f"V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h     Gaz = {gaz:3.0f} ch Vold = {vold:6.2f} "
-            f"Idx = {idx:5d} Ecart = {ecart:6.2f}"
-        )
+            f"F_com = {F_com:5d}")
+
         self.telemesure1.config(text=str(texteaff))
 
-        # Télémesure 2 (affichage direct des arguments formatés)
-        texteaff = (
-            "FORCES APPLIQUES AU CDG:  "
+    def show_telemetry_2(self, pos_x, pos_y, vit_x, vit_y, lacet_deg, V, V_kmh, vold, idx, ecart_lat, v_lat, curv, curv_N):
+        """Met à jour l'affichage de télémesure ligne 1.
+
+        Tous les calculs numériques doivent être faits en amont :
+        cette fonction se contente d'afficher les valeurs passées en arguments.
+        """
+        # Télémesure 1 (affichage direct des arguments formatés)
+        texteaff = ("KART "
+            f"X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Lacet = {lacet_deg:6.2f} "
+            f"Vx = {vit_x:6.2f}  Vy = {vit_y:6.2f}  V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h"
+            f"Vold = {vold:6.2f} Idx = {idx:5d} Ecart_lat = {ecart_lat:6.2f} V_lat = {v_lat:6.2f}"
+            f"Curv = {curv:6.2f} Curv_N = {curv_N:6.2f}"
+        )
+        self.telemesure2.config(text=str(texteaff))
+
+    def show_telemetry_3(self, f_cdg_x, f_cdg_y, f_cdg_z, force_cdg, moment_cdg, radius, varbre, vstab):
+        """Met à jour l'affichage de télémesure ligne 3
+        """
+        # Télémesure 3 (affichage direct des arguments formatés)
+        texteaff = ("KART INTERNE"
             f"Fcdg x ={f_cdg_x:^+10.2f}  Fcdg y ={f_cdg_y:^+10.2f}  Fcdg z ={f_cdg_z:^+10.2f} "
             f"F_cdg = {force_cdg:^+10.2f} Mcdg ={moment_cdg:^+10.2f}   Radius ={radius:^+10.2f} "
             f"Varbre = {varbre:^+10.2f}  Vstab = {vstab:^+10.2f}"
         )
-        self.telemesure2.config(text=str(texteaff))
+        self.telemesure3.config(text=str(texteaff))
     
     def update_camera_position(self, position):
         """Met à jour la position de la caméra drone en fonction de la position du kart passée en argument"""

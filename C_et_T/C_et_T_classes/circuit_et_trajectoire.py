@@ -270,44 +270,12 @@ class Trajectoire(Profil):
         self.type_accel = []                     # Type d'accélération en chaque point
         self.optimization_type = 1              # Type d'optimisation
         self.lap_time = 0.0                      # Temps au tour
-        self.ecarts = []                     # Paramètres de position (-1 à +1)
         
     def reset_fine_profile(self):
         """Surcharge pour réinitialiser aussi les attributs spécifiques à la trajectoire"""
         super().reset_fine_profile()
         self.velocities = []
         self.lap_time = 0.0
-        self.ecarts = []
-
-    # def calculate_ecarts_positions(self, circuit):
-    #     """Calcule les paramètres de position (-1 à +1) selon le circuit"""
-    #     #LE PROBLEME, C'EST QU'IL FAUT CONNAITRE LE CIRCUIT, A FAIRE
-    #     if not circuit or len(self.fine_points) == 0:
-    #         return
-            
-    #     self.ecarts_positions = []
-        
-    #     for traj_point in self.fine_points:
-    #         # Trouver le point le plus proche sur le circuit fin
-    #         distances = [np.linalg.norm(traj_point - circuit_point) 
-    #                     for circuit_point in circuit.fine_points]
-    #         closest_idx = np.argmin(distances)
-            
-    #         # Vecteur du point circuit au point trajectoire
-    #         vector_to_traj = traj_point - circuit.fine_points[closest_idx]
-            
-    #         # Projection sur le vecteur normal
-    #         normal = circuit.get_normal_at_index(closest_idx)
-    #         if normal is not None:
-    #             projection = np.dot(vector_to_traj, normal)
-                
-    #             # Paramètre de -1 à +1
-    #             param = 2 * projection / circuit.width
-    #             param = np.clip(param, -1, 1)
-    #         else:
-    #             param = 0
-                
-    #         self.ecarts_positions.append(param)
             
     def calculate_lap_time(self):
         """Calcule le temps au tour selon les vitesses"""
@@ -351,11 +319,8 @@ class Trajectoire(Profil):
         # on a dejà les paramètres du profil parent, à savoir tangents[], normals[], curvatures[], distances[], length
         super().calculate_parameters()
 
-        """Calcule des paramètres specifiques de la trajectoire: ecart, vitesses, temps au tour"""
+        """Calcule des paramètres specifiques de la trajectoire: vitesses, temps au tour"""
 
-        # # Calculer les ecarts (-1, 1)  sur le circuit parent
-        # self.calculate_ecarts_positions(circuit)
-        
         # Calculer les vitesses
         self.calculate_velocities()
         
@@ -379,18 +344,12 @@ class Trajectoire(Profil):
         if isinstance(velocities, list):
             velocities = [_jsonify(v) for v in velocities]
 
-        ecarts = self.ecarts
-        ecarts = _jsonify(ecarts)
-        if isinstance(ecarts, list):
-            ecarts = [_jsonify(e) for e in ecarts]
-
         traj_data = {
             'max_acceleration': _jsonify(self.max_acceleration),
             'max_velocity': _jsonify(self.max_velocity),
             'velocities': velocities,
-            'lap_time': _jsonify(self.lap_time),
-            'ecarts': ecarts
-        }
+            'lap_time': _jsonify(self.lap_time)}
+
         data = {'profil': profil, 'traj_data': traj_data}
         return data
         
@@ -408,7 +367,6 @@ class Trajectoire(Profil):
         self.max_velocity = traj_data.get('max_velocity', self.max_velocity)
         self.velocities = traj_data.get('velocities', [])
         self.lap_time = traj_data.get('lap_time', 0.0)
-        self.ecarts = traj_data.get('ecarts', [])
 
     def _save_trajectory_csv(self, filename):
         """Sauvegarde CSV (actuellement non implémentée)."""
@@ -430,7 +388,7 @@ class Trajectoire(Profil):
         filename = filedialog.asksaveasfilename(
             defaultextension=".csv",
             initialdir=str(_dir_files_path()),
-            filetypes=[("CSV files", "*.csv"), ("JSON files", "*.json"), ("All files", "*.*")]
+            filetypes=[("JSON files", "*.json"), ("CSV files", "*.csv"), ("All files", "*.*")]
         )
 
         if not filename:

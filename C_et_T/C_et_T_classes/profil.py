@@ -184,9 +184,9 @@ class Profil:
 
     def calculate_parameters(self):
         """Calcule tous les paramètres du profil fin"""
-        # tangents[]: vecteurs tangents
-        # normals[]: vecteurs normaux
-        # curvatures[]: courbures (signés si possible, A FAIRE)
+        # tangents[]: vecteurs unitaire tangents à la trajectoire
+        # normals[]: vecteurs unitaire normal à la trajectoire, vers la gauche (en affichage +Y vers le haut !)
+        # curvatures[]: courbures (signés si possible, positif dans le sens X ^ Y donc.
         # distances[]: distances entre le point courant et son suivant
         # length: longueur totale
 
@@ -225,7 +225,7 @@ class Profil:
                 
             self.tangents.append(tangent)
             
-            # Vecteur normal (rotation de 90°)
+            # Vecteur normal (rotation de 90° vers la gauche)
             normal = np.array([-tangent[1], tangent[0]])
             
             # Ajuster la direction du vecteur normal pour les profils ouverts
@@ -251,7 +251,7 @@ class Profil:
                 cross_product = v1[0] * v2[1] - v1[1] * v2[0]
                 dot_product = np.dot(v1, v2)
                 if abs(dot_product) > 1e-10:
-                    return math.atan2(abs(cross_product), dot_product) / dist, dist 
+                    return math.atan2(cross_product, dot_product) / dist, dist 
                 else:
                     return math.pi/2 / dist, dist 
                            

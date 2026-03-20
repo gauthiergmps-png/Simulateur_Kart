@@ -217,7 +217,7 @@ class ImageBackgroundManager:
                 coords_entry.delete(0, tk.END)
                 coords_entry.insert(0, clipboard_content)
             except tk.TclError:
-                messagebox.showwarning("Attention", "Aucun contenu dans le presse-papiers")
+                messagebox.showerror("Erreur", "Aucun contenu dans le presse-papiers")
         
         ttk.Button(button_frame, text="Coller", command=paste_coords).pack(side=tk.LEFT, padx=10)
         

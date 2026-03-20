@@ -23,14 +23,13 @@ Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 00
 V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet, et je produit un fichier
        traj_1.json qui me permettra d'avoir une trajectoire cible
        
-V1.2.1: Trajectoire cible visualisée dans SimulUI et fonction ecart position kart disponible
-
+V1.2.1: Trajectoire cible visualisée dans SimulUI et fonction ecart_trajectoire donnant les observables pertinent
+       Ajout d'une classe Kart_control pour héberger les modes de pilotage
+       
 # TODO
+Hèlas toujours commencer par demander d'appliquer les cursorrules...
 
-SimulUI:
-Ajouter un choix d'agents de controle, proportionel, Q_Learning, DQ_Learning,..
-Agent proportionnel:
-Calculer volant = écart - lambda(V) Vy simplement
+Trajectoire: mettre un signe à la curvature
 
 Agent q_learning:
 Symétriser la matrice Q pour exploiter la symétrie du problème
