@@ -45,6 +45,10 @@ class User_Interface:
         self.F_com = []
         self.t_cyclemax = 0.
         self.simul_pause=True
+
+        # Mode d'exploration des états possibles
+        self.explore_status = False
+        # exp_cap / exp_vit / exp_vol / exp_gaz : IntVar créés dans _create_control_panel (cases EXPLORE)
         
         # Variables de caméra
         self.xcam = 0.
@@ -67,6 +71,12 @@ class User_Interface:
         """Crée la fenêtre principale"""
         self.fenetre = Tk()
         self.fenetre.title("Simulateur Sprint Car by Laurent Gauthier - V0.13")
+        self.fenetre.protocol("WM_DELETE_WINDOW", self._quit_application)
+
+    def _quit_application(self):
+        """Sort proprement de mainloop() puis détruit la fenêtre (nécessaire sur Windows)."""
+        self.fenetre.quit()
+        self.fenetre.destroy()
     
     def _create_control_panel(self):
         """Crée le panneau de contrôle avec tous les widgets"""
@@ -76,6 +86,10 @@ class User_Interface:
         self.methode = IntVar()
         self.regul = IntVar()
         self.transm = IntVar()
+        self.exp_cap = IntVar(value=0)
+        self.exp_vit = IntVar(value=0)
+        self.exp_vol = IntVar(value=0)
+        self.exp_gaz = IntVar(value=0)
         
         # Bandeau principal
         bandeau = Frame(self.fenetre, width=1800, height=100, highlightbackground="red", highlightthickness=2)
@@ -91,8 +105,9 @@ class User_Interface:
                                highlightbackground="black", highlightthickness=1)
             frames[name].pack(side=LEFT)
         
-        # Frame B - Commandes
-        self._create_command_frame(frames['frameB'])
+        # Frame B - Tabulation des états possibles
+        self._create_explore_states_frame(frames['frameB'])
+        
         
         # Frame A - Contrôle propagation
         self._create_propagation_frame(frames['frameA'])
@@ -118,8 +133,8 @@ class User_Interface:
         # Frame 5 - Régulateur et asservissement
         self._create_regulator_frame(frames['frame5'])
         
-        # Frame 6 - LIBRE 
-        # self._create_dynamic_control_frame(frames['frame6'])
+        # Frame 6 - Agent de Controles
+        self._create_command_frame(frames['frame6'])
         
         # Frame 7 - Ouverture et transmission
         self._create_transmission_frame(frames['frame7'])
@@ -130,6 +145,17 @@ class User_Interface:
         # Zone télémesures
         self._create_telemetry_zone()
     
+    def _create_explore_states_frame(self, frame):
+        """Crée le frame de tabulation des états possibles"""
+        Label(frame, text="""États possibles:""", justify=LEFT, padx=20).pack()
+
+        Checkbutton(frame, text="Explore cap", padx=20, variable=self.exp_cap, onvalue=1, offvalue=0).pack(anchor=W)
+        Checkbutton(frame, text="Explore vit", padx=20, variable=self.exp_vit, onvalue=1, offvalue=0).pack(anchor=W)
+        Checkbutton(frame, text="Explore vol", padx=20, variable=self.exp_vol, onvalue=1, offvalue=0).pack(anchor=W)
+        Checkbutton(frame, text="Explore gaz", padx=20, variable=self.exp_gaz, onvalue=1, offvalue=0).pack(anchor=W)
+
+        Button(frame, text="EXPLORE", fg="green", command=self._handle_explore).pack(padx=10, pady=5, anchor=N)
+
     def _create_command_frame(self, frame):
         """Crée le frame des commandes (libellés fournis par Kart_control.list_available_controls)."""
         Label(frame, text="""Commandes:""", justify=LEFT, padx=20).pack()
@@ -161,7 +187,7 @@ class User_Interface:
     
     def _create_camera_frame(self, frame):
         """Crée le frame de contrôle de la caméra drone"""
-        self.cam_alt = Scale(frame, from_=10, to=1000, length=100, 
+        self.cam_alt = Scale(frame, from_=2, to=300, length=100, 
                             label="Altitude drone", orient=HORIZONTAL)
         self.cam_alt.set(self.cam_alt0)
         self.cam_alt.pack()
@@ -175,7 +201,7 @@ class User_Interface:
         """Crée le frame des boutons de contrôle"""
         Button(frame, text="RESET", fg="green", command=self._handle_reset).pack(padx=10, pady=5, anchor=N)
         Button(frame, text="PAUSE", fg="blue", command=self._handle_pause).pack(padx=10, pady=5, anchor=CENTER)
-        Button(frame, text="QUIT", fg="red", command=self.fenetre.destroy).pack(padx=10, pady=5, anchor=S)
+        Button(frame, text="QUIT", fg="red", command=self._quit_application).pack(padx=10, pady=5, anchor=S)
 
     def _create_recorder_buttons_frame(self, frame):
         """Crée le frame des boutons du recorder"""
@@ -189,7 +215,7 @@ class User_Interface:
     def _create_circuits_frame(self, frame):
         """Crée le frame des commandes"""
         Label(frame, text="""Circuit:""", justify=LEFT, padx=20).pack()
-        Button(frame, text="Load Trajectoire", fg="blue", command=self._handle_load_traj).pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="Load Trajectoire", fg="blue", command=self._handle_load_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
         self.circuit.set(0)
      
     def _create_steering_frame(self, frame):
@@ -205,21 +231,25 @@ class User_Interface:
         self.H_cdg.pack()
 
     def _create_regulator_frame(self, frame):
-        """Crée le frame du régulateur de vitesse"""
+        """Crée le frame des réglages asservisements de controle:
+               Une case à cocher pour le régulateur de vitesse
+               et trois paramètres (P1, P2, P3) pour l'asservissement de controle"""
         
         Checkbutton(frame, text="Regulateur de vitesse", padx=20, variable=self.regul,
                    onvalue=1, offvalue=0).pack(anchor=W)
         
-        self.ass_gain_stat = Scale(frame, from_=0, to=50, resolution=1, length=100, 
-                                   label="Gain Statique", orient=HORIZONTAL)
-        self.ass_gain_stat.set(12)
-        self.ass_gain_stat.pack()
+        self.ass_p1 = Scale(frame, from_=0, to=100, resolution=1, length=100, label="Paramètre p1", orient=HORIZONTAL)
+        self.ass_p1.set(10)
+        self.ass_p1.pack()
 
-        self.ass_gain_dyn = Scale(frame, from_=0, to=100, resolution=1, length=100, 
-                                  label="Gain Dynamique", orient=HORIZONTAL)
-        self.ass_gain_dyn.set(12)
-        self.ass_gain_dyn.pack()
-    
+        self.ass_p2 = Scale(frame, from_=0, to=100, resolution=1, length=100, label="Paramètre p2", orient=HORIZONTAL)
+        self.ass_p2.set(10)
+        self.ass_p2.pack()
+
+        self.ass_p3 = Scale(frame, from_=0, to=100, resolution=1, length=100, label="Paramètre p3", orient=HORIZONTAL)
+        self.ass_p3.set(10)
+        self.ass_p3.pack()
+
     def _create_transmission_frame(self, frame):
         """Crée le frame de transmission"""
         self.ouverture = Scale(frame, from_=-5, to=5, resolution=1, length=100, 
@@ -264,6 +294,11 @@ class User_Interface:
         # Cette méthode doit être surchargée par la classe qui utilise UI
         pass
     
+    def _handle_explore(self):
+        """Lance la tabulation des états possibles du Kart avec les cases cochées
+        """
+        self.explore_status = True
+
     def _handle_reset(self):
         """Gère l'action de reset - appelle la méthode surchargée"""
         self.reset()
@@ -286,7 +321,7 @@ class User_Interface:
         self.record_status = False
         self.btn_record.config(text="RECORD")  # reste disabled jusqu'au prochain reset
 
-    def _handle_load_traj(self):
+    def _handle_load_T_or_C(self):
         """Gère l'action de chargement de la trajectoire cible
         Sera chargé dans la classe SimulationUI"""
         pass
@@ -320,7 +355,7 @@ class User_Interface:
 
         self.telemesure1.config(text=str(texteaff))
 
-    def show_telemetry_2(self, pos_x, pos_y, vit_x, vit_y, lacet_deg, V, V_kmh, vold, idx, ecart_lat, v_lat, curv, curv_N):
+    def show_telemetry_2(self, pos_x, pos_y, vit_x, vit_y, lacet_deg, v_lacet_deg, V, V_kmh, vold, idx, ecart_lat, v_lat, curv, curv_N):
         """Met à jour l'affichage de télémesure ligne 1.
 
         Tous les calculs numériques doivent être faits en amont :
@@ -328,7 +363,7 @@ class User_Interface:
         """
         # Télémesure 1 (affichage direct des arguments formatés)
         texteaff = ("KART "
-            f"X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Lacet = {lacet_deg:6.2f} "
+            f"X = {pos_x:6.2f}   Y = {pos_y:6.2f}   Lacet = {lacet_deg:6.2f} V_lacet = {v_lacet_deg:6.2f} "
             f"Vx = {vit_x:6.2f}  Vy = {vit_y:6.2f}  V =  {V:6.2f} m/s =  {V_kmh:6.2f} km/h"
             f"Vold = {vold:6.2f} Idx = {idx:5d} Ecart_lat = {ecart_lat:6.2f} V_lat = {v_lat:6.2f}"
             f"Curv = {curv:6.2f} Curv_N = {curv_N:6.2f}"
@@ -356,6 +391,6 @@ class User_Interface:
         """Lance la boucle principale de l'interface"""
         self.fenetre.mainloop()
     
-    def after(self, ms, callback):
-        """Programme un appel de fonction après un délai"""
-        self.fenetre.after(ms, callback)
+    def after(self, ms, callback, *args):
+        """Programme un appel de fonction après un délai (même sémantique que ``Tk.after``)."""
+        self.fenetre.after(ms, callback, *args)

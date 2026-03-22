@@ -309,7 +309,6 @@ def play_many_games(bins, N=500, record=False):
 
     return length, reward, Q
 
-
 def plot_running_avg(totalrewards):
     N = len(totalrewards)
     running_avg = np.empty(N)

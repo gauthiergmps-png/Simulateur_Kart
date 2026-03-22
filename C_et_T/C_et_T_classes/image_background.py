@@ -77,13 +77,8 @@ class ImageBackgroundManager:
                 self.image_loaded = True
                 self.info_label.config(text=f"Image modèle chargée: {os.path.basename(filename)}\n"
                                            f"Dimensions: {width_m:.0f}m × {height_m:.0f}m")
-                
-                # Ajuster la vue pour afficher l'image complète
-                # self.ax.set_xlim(self.image_extent[0], self.image_extent[1])
-                # self.ax.set_ylim(self.image_extent[2], self.image_extent[3])
-                # self.ax._xlim = (self.image_extent[0], self.image_extent[1])
-                # self.ax._ylim = (self.image_extent[2], self.image_extent[3])
-                
+                # Les limites d'axes visibles sont appliquées par l'appelant (current_xlim / current_ylim)
+                # après le chargement — ne pas utiliser ax._xlim / _ylim (non pris en compte par Matplotlib).
                 return True
                 
             except Exception as e:
@@ -235,10 +230,22 @@ class ImageBackgroundManager:
         
         return result[0]
     
-    def display_background_image(self, circuit_input_mode):
-        """Affiche l'image de fond si elle est chargée et en mode saisie circuit"""
-        if circuit_input_mode and self.image_loaded and self.background_image is not None:
-            self.ax.imshow(self.background_image, extent=self.image_extent, alpha=0.3, aspect='auto', zorder=0)
+    def display_background_image(self, circuit_input_mode: bool):
+        """Affiche l'image modèle uniquement en mode saisie circuit (zorder=0). Les données restent chargées hors saisie."""
+        if (
+            circuit_input_mode
+            and self.image_loaded
+            and self.background_image is not None
+            and self.image_extent is not None
+        ):
+            self.ax.imshow(
+                self.background_image,
+                extent=self.image_extent,
+                alpha=0.35,
+                aspect="equal",
+                zorder=0,
+                interpolation="bilinear",
+            )
     
     def is_image_loaded(self):
         """Retourne True si une image est chargée"""

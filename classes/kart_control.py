@@ -41,11 +41,12 @@ class Kart_control:
         self.kp_stat = 12.0   # ° par mètre d'écart latéral
         self.kp_dyn = 40.0   # ° par radian d'écart angulaire tangent / vitesse
 
-    def set_gains(self, kp_stat, kp_dyn):
+    def set_gains(self, p1, p2, p3):
         """Définit les gains de l'asservissement P sur l'écart latéral et l'écart angulaire.
         Appelé par SimulUI en phase réglage"""
-        self.kp_stat = kp_stat
-        self.kp_dyn = kp_dyn
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
 
     def control_proportionnel(self, manual_commands, observation):
         """Asservissement P sur l'écart latéral (m) et l'écart angulaire (rad).
@@ -54,13 +55,14 @@ class Kart_control:
         Sans trajectoire, l'appelant peut éviter d'utiliser ce mode ou passer des zéros.
         """
         idx, ecart_lat, v_lat, curv, curv_N = observation
-        # logique gauthier: on vise une vitesse latérale de rapprochement de 1m/s de signe opposé à l'écat_lat
-        # si on est écarté de plus de kp_stat
-        v_cible= - np.sign(ecart_lat)
+        # logique gauthier: on vise une vitesse latérale de rapprochement de gain*P3 m/s de signe opposé à l'écat_lat
+
+        # si on est écarté de plus de p2 m, gain saturé à p1, sinon décroissant linéairement en dessous de p2
+        gain=min(abs(ecart_lat),self.p2)/self.p2
+        v_cible= - np.sign(ecart_lat)*self.p3*gain
         ecart_vlat=v_lat-v_cible
 
-        ecart_sature=min(abs(ecart_lat),self.kp_stat)
-        volant =  - self.kp_dyn * ecart_vlat # * ecart_sature
+        volant =  - self.p1 * ecart_vlat  * gain
         
         volant = float(np.clip(volant, -45., 45.0))
         return {"volant": volant, "gaz": float(manual_commands['gaz']), "frein": float(manual_commands['frein'])}

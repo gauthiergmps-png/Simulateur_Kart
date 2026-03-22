@@ -13,17 +13,13 @@ Je supprime la classe File_manager pour avoir les méthodes load et save directe
 
 # TODOs
 
-Visualiser le starting point et prévoir de recaler dans le repère absolu de mon choix
-
+Le nombre de fine_point pourra être déterminé pour être défini par la longueur du raw_circuit et avoir 1 pt/m
 
 A la lecture, il faut regénérer les data qu'on peut plutot que de relire le fichier
 
 suppression du 5ème PDP: j'ai un crash d'index sur le plus proche dès fois, à comprendre
 
 Finir validation des vitesses et temps au tour en fermé et ouvert
-
-check image de fond
-
 
 
 

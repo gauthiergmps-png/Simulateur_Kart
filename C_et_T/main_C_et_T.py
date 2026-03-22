@@ -1,5 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+
+# Doit être fait avant pyplot / backends pour un 2e lancement fiable dans le même terminal (Windows).
+import matplotlib
+
+matplotlib.use("TkAgg")
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
@@ -15,7 +21,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from C_et_T.C_et_T_classes.circuit_et_trajectoire import Circuit, Trajectoire
+from C_et_T.C_et_T_classes.circuit_et_trajectoire import Circuit, Trajectoire, load_C_or_T__dialog
 from C_et_T.C_et_T_classes.image_background import ImageBackgroundManager
 
 class CircuitSimulator:
@@ -55,7 +61,6 @@ class CircuitSimulator:
         
         # Variables pour l'image de fond
         self.image_manager = None  # Sera initialisé après setup_plot()
-        self.view_ratio = 120./90.
         self.view_width = 120.
         self.current_xlim = None
         self.current_ylim = None
@@ -65,12 +70,28 @@ class CircuitSimulator:
 
         # Initialiser le gestionnaire d'image après la création de self.ax
         self.image_manager = ImageBackgroundManager(self.root, self.ax, self.info_label)
-        
+
+    def _reset_model_background_image(self):
+        """Efface l'image modèle (nouveau circuit ou chargement d'un autre fichier). Hors saisie, l'image reste en mémoire pour réaffichage."""
+        if self.image_manager:
+            self.image_manager.reset_image()
+
     def load_background_image(self):
         """Wrapper pour charger l'image de fond"""
+        if not self.circuit.input_mode:
+            return
         if self.image_manager:
             success = self.image_manager.load_background_image()
-            if success and self.circuit.input_mode:
+            if success and self.image_manager.image_extent is not None:
+                ext = self.image_manager.image_extent
+                # Vue carrée englobant l'image (même échelle X/Y, cohérent avec zoom / aspect 1:1)
+                x0, x1, y0, y1 = ext[0], ext[1], ext[2], ext[3]
+                cx = (x0 + x1) / 2
+                cy = (y0 + y1) / 2
+                half = max(abs(x1 - x0), abs(y1 - y0)) / 2
+                self.current_xlim = (cx - half, cx + half)
+                self.current_ylim = (cy - half, cy + half)
+            if success:
                 self.update_plot(False)
         
     def setup_ui(self):
@@ -89,7 +110,9 @@ class CircuitSimulator:
         ttk.Button(circuit_frame, text="Nouveau Circuit", command=self.new_circuit).pack(fill=tk.X, pady=2)
         self.circuit_input_button = ttk.Button(circuit_frame, text="Saisie Circuit", command=self.toggle_circuit_input)
         self.circuit_input_button.pack(fill=tk.X, pady=2)
-        self.image_button = ttk.Button(circuit_frame, text="Charger Image Modèle", command=self.load_background_image)
+        self.image_button = ttk.Button(
+            circuit_frame, text="Charger Image Modèle", command=self.load_background_image, state="disabled"
+        )
         self.image_button.pack(fill=tk.X, pady=2)
         ttk.Button(circuit_frame, text="Recentrer Vue", command=self.recenter_view).pack(fill=tk.X, pady=2)
         ttk.Button(circuit_frame, text="Charger Circuit", command=self.load_circuit).pack(fill=tk.X, pady=2)
@@ -159,7 +182,7 @@ class CircuitSimulator:
         
     def setup_plot(self):
         """Configure le graphique matplotlib"""
-        #self.ax.set_aspect('equal')
+        self.ax.set_aspect("equal")
         self.ax.grid(True, alpha=0.3)
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
@@ -170,10 +193,13 @@ class CircuitSimulator:
 
     def setup_view(self):
         view_width = self.view_width
-        self.current_xlim = (-view_width/2, view_width/2)
-        self.current_ylim = (-view_width/2/self.view_ratio, view_width/2/self.view_ratio)
+        half = view_width / 2
+        # Même étendue en X et Y : échelle 1:1 (1 m horizontal = 1 m vertical à l'écran).
+        self.current_xlim = (-half, half)
+        self.current_ylim = (-half, half)
         self.ax.set_xlim(self.current_xlim)
         self.ax.set_ylim(self.current_ylim)
+        self.ax.set_aspect("equal")
 
         
     def on_scroll(self, event):
@@ -191,16 +217,20 @@ class CircuitSimulator:
         else:
             scale_factor = 1
             
-        new_width = (self.current_xlim[1] - self.current_xlim[0]) * scale_factor
-        new_height = (self.current_ylim[1] - self.current_ylim[0]) * scale_factor
-        
-        relx = (self.current_xlim[1] - xdata) / (self.current_xlim[1] - self.current_xlim[0])
-        rely = (self.current_ylim[1] - ydata) / (self.current_ylim[1] - self.current_ylim[0])
-        
-        self.current_xlim = [xdata - new_width * (1 - relx), xdata + new_width * relx]
-        self.current_ylim = [ydata - new_height * (1 - rely), ydata + new_height * rely]
+        x_span = self.current_xlim[1] - self.current_xlim[0]
+        y_span = self.current_ylim[1] - self.current_ylim[0]
+        if x_span <= 0 or y_span <= 0:
+            return
+        span = max(x_span, y_span) * scale_factor
+
+        relx = (self.current_xlim[1] - xdata) / x_span
+        rely = (self.current_ylim[1] - ydata) / y_span
+
+        self.current_xlim = [xdata - span * (1 - relx), xdata + span * relx]
+        self.current_ylim = [ydata - span * (1 - rely), ydata + span * rely]
         self.ax.set_xlim(self.current_xlim)
         self.ax.set_ylim(self.current_ylim)
+        self.ax.set_aspect("equal")
         
         self.canvas.draw()
         
@@ -305,6 +335,7 @@ class CircuitSimulator:
             self.current_ylim = (self.drag_ylim[0] - dy, self.drag_ylim[1] - dy)
             self.ax.set_xlim(self.current_xlim)
             self.ax.set_ylim(self.current_ylim)
+            self.ax.set_aspect("equal")
             #self.update_plot(True)   
             self.canvas.draw_idle()  
         elif self.circuit.input_mode:
@@ -441,7 +472,8 @@ class CircuitSimulator:
         self.circuit.calculate_fine_profile()
         self.circuit.calculate_parameters()
         # Désactiver le mode saisie circuit après calcul
-        if stop: self.circuit.stop_input()
+        if stop:
+            self.circuit.stop_input()
         self.update_plot(motion)
         self.circuit_info_label.config(text=f"Circuit fin calculé: {len(self.circuit.fine_points)} points, "
                                     f"Longueur: {self.circuit.length:.1f}m")
@@ -475,22 +507,18 @@ class CircuitSimulator:
             x_min, x_max = points[:, 0].min(), points[:, 0].max()
             y_min, y_max = points[:, 1].min(), points[:, 1].max()
             
-            # Ajouter une marge
+            # Ajouter une marge ; fenêtre carrée en données pour aspect 1:1
             margin = min(max(x_max - x_min, y_max - y_min) * 0.2, 10)
-            largeur = x_max - x_min+2*margin
-            hauteur = y_max - y_min+2*margin
-            if largeur > hauteur*self.view_ratio: # c'est x qui domine
-                self.current_xlim = (x_min - margin, x_max + margin)
-                self.ax.set_xlim(self.current_xlim)
-                y_mean=(y_min+y_max)/2
-                self.current_ylim = (y_mean-largeur/2./self.view_ratio, y_mean+largeur/2./self.view_ratio)
-                self.ax.set_ylim(self.current_ylim)
-            else: # c'est y qui domine
-                self.current_ylim = (y_min - margin, y_max + margin)
-                self.ax.set_ylim(self.current_ylim)
-                x_mean=(x_min+x_max)/2
-                self.current_xlim = (x_mean-hauteur/2.*self.view_ratio, x_mean+hauteur/2.*self.view_ratio)
-                self.ax.set_xlim(self.current_xlim)
+            cx = (x_min + x_max) / 2
+            cy = (y_min + y_max) / 2
+            half_wx = (x_max - x_min) / 2 + margin
+            half_wy = (y_max - y_min) / 2 + margin
+            half = max(half_wx, half_wy)
+            self.current_xlim = (cx - half, cx + half)
+            self.current_ylim = (cy - half, cy + half)
+            self.ax.set_xlim(self.current_xlim)
+            self.ax.set_ylim(self.current_ylim)
+            self.ax.set_aspect("equal")
 
         self.canvas.draw()
         
@@ -507,6 +535,7 @@ class CircuitSimulator:
 
     def new_circuit(self):
         """Crée un nouveau circuit"""
+        self._reset_model_background_image()
         self.circuit = Circuit("Circuit Principal", is_closed=True, width=self.width_var.get())
         self.circuit.is_closed = self.closed_var.get()
         self.trajectory = Trajectoire("Trajectoire", is_closed=self.circuit.is_closed)  # Nouvelle trajectoire
@@ -528,23 +557,38 @@ class CircuitSimulator:
             self.trajectory_info_label.config(text=f"Trajectoire sauvegardée")
                 
     def load_trajectory(self):
-        """Charge la trajectoire en utilisant Trajectoire dialog."""
-        new_traj = Trajectoire.load_trajectory_dialog()
-        if new_traj:
-            self.trajectory = new_traj
+        """Charge la trajectoire (dialogue commun circuit / trajectoire)."""
+        loaded = load_C_or_T__dialog()
+        if loaded is None:
+            return
+        if isinstance(loaded, Trajectoire):
+            self.trajectory = loaded
             self.update_plot(False)
             self.trajectory_info_label.config(text="Trajectoire chargée")
-                
+        else:
+            messagebox.showerror(
+                "Erreur",
+                "Le fichier choisi est un circuit. Chargez une trajectoire (JSON avec 'traj_data').",
+            )
+
     def load_circuit(self):
-        """Charge un circuit en utilisant Circuit dialog."""
-        new_circuit = Circuit.load_circuit_dialog()
-        if new_circuit:
-            self.circuit = new_circuit
+        """Charge un circuit (dialogue commun circuit / trajectoire)."""
+        loaded = load_C_or_T__dialog()
+        if loaded is None:
+            return
+        if isinstance(loaded, Circuit):
+            self._reset_model_background_image()
+            self.circuit = loaded
             self.width_var.set(self.circuit.width)
             self.closed_var.set(self.circuit.is_closed)
             self.trajectory.reset_fine_profile()
             self.update_plot(False)
-            self.circuit_info_label.config(text=f"Circuit chargé")
+            self.circuit_info_label.config(text="Circuit chargé")
+        else:
+            messagebox.showerror(
+                "Erreur",
+                "Le fichier choisi est une trajectoire. Chargez un circuit (JSON avec 'circuit_data' ou CSV).",
+            )
 
     def toggle_circuit_input(self):
         """Bascule le mode saisie circuit"""
@@ -589,6 +633,7 @@ class CircuitSimulator:
                                       f"\nTemps au tour: {self.trajectory.lap_time:.2f} s")
         if self.circuit.input_mode:
             self.circuit_save_button.config(state='disabled')
+            self.image_button.config(state='normal')
             self.circuit_input_button.config(text="Arrêter Saisie Circuit")
             if not self.circuit.is_ready_for_calculation():
                 self.circuit_input_button.config(state='disabled')
@@ -598,6 +643,7 @@ class CircuitSimulator:
                                                 "Clic droit pour effacer le dernier point.\n"
                                                 "Echap pour annuler.")
         else:
+            self.image_button.config(state='disabled')
             self.circuit_input_button.config(text="Saisie Circuit")
             self.circuit_save_button.config(state='normal')
             self.info_label.config(text=f"RIEN A DIRE")
@@ -703,7 +749,7 @@ class CircuitSimulator:
 
         self.update_instructions_and_buttons()
         self.ax.clear()
-        #self.ax.set_aspect('equal')
+        self.ax.set_aspect("equal")
         self.ax.grid(True, alpha=0.3)
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
@@ -711,7 +757,7 @@ class CircuitSimulator:
         self.ax.set_xlim(self.current_xlim)
         self.ax.set_ylim(self.current_ylim)
         
-        # Afficher l'image de fond en mode saisie circuit
+        # Image modèle géoréférencée (mode saisie circuit uniquement)
         self.image_manager.display_background_image(self.circuit.input_mode)
         
         # Afficher le circuit grossier (polygone et points) quand on est en mode saisie circuit
@@ -801,6 +847,7 @@ class CircuitSimulator:
         # Ne jamais changer automatiquement les limites - seulement les restaurer si elles existent
         self.ax.set_xlim(self.current_xlim)
         self.ax.set_ylim(self.current_ylim)
+        self.ax.set_aspect("equal")
 
         self.canvas.draw()
 
@@ -808,7 +855,25 @@ class CircuitSimulator:
 def main():
     root = tk.Tk()
     app = CircuitSimulator(root)
-    root.mainloop()
+
+    def on_closing():
+        # Libère Matplotlib avant de détruire le canvas Tk (évite état backend / Tcl bloqué au prochain run).
+        try:
+            plt.close("all")
+        except Exception:
+            pass
+        root.quit()
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    try:
+        root.mainloop()
+    finally:
+        try:
+            plt.close("all")
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     main()

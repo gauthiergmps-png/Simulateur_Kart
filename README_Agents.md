@@ -1,5 +1,35 @@
 Vocabulaire: un step = une action soit un pas de simul, un run = une séquence de simul.
 
+# METHODE GAUTHIER FROM TRAJECTORY TO STATE
+
+Je cherche à executer la trajectoire optimale, qui est définie par une force constante égale au poid appliquée au cdg,dont l'orientation varie. Il me faut donc trouver une évolution du lacet kart qui (1) rend la chose possible et (2) puisse être une évolution dynamique naturelle issue du moment_lacet.
+
+## Etude de faisabilité: 
+
+En repère véhicule, le kart a un état défini par son cap (angle du vecteur vitesse), sa vitesse (scalaire) et les commandes (volant, gaz/frein), soit un espace E_kart à 4 dimensions. Il me faut explorer cet espace pour savoir chaque état quels sont les f_cdg et m_cdg.
+
+Si je veux  obj_glisse = (f_cdg en moduule >90% du poid), j'ai un sous-ensemble E_glisse de E_kart. 
+
+Existe t il déjà en chaque point de la trajectoire, un état de glisse du kart répondant au besoin ? 
+
+à priori oui, à vérifier, mais il faut aussi que le m_cdg soit raisonable..
+
+
+Une glisse "stable" aura un f_cdg orthogonal à la vitese, j'aurai E_glisse_stable sous ensemble de E_glisse.
+
+Par rotation lacet, je peux mettre f_cdg sur l'axe Y, et filter sur cet espace E le sous-ensemble E0 qui rempli l'objectif, 
+
+
+et y identifier le moment_cdg qui va avec.
+
+
+
+# Faisabilité dynamique:
+La faisaiblité statique donnera une range de lacet possible en chaque point de la trajectoire. Il me faut en déduire une séquence possible et cohérente de l'évolution imposée par le couple lacet.
+
+J'ai choisi en étude de faisabilité f>95% car dès que les forces avant et arrière ne sont pas parfaitement alignées on aura pas 100% du poid, car il me faudra avoir un peu de marge donc pour trouver une dynamique possible.
+
+
 # STEP 0: ALLER TOUT DROIT EN Q_LEARNING
 
 15/03/2026: Premier test d'un Agent Qlearning, avec un état 10**3, donc 3 bins de 10.
@@ -104,28 +134,19 @@ Sinon on apprend toujours la même séquence au début, en effet
 6. Avoir un état en repère véhicule
 Ce que je fait déjà, et ajouter des infos de courbure trajectoire cible à 2m et à 2 secondes
 
-NEXT STEP: SUIVRE UN CIRCUIT VITESSE CONSTANTE
+# NEXT STEPS
 
 
-NEXT STEP: DEEP Q _LEARNING
+## NEXT STEP: DEEP Q _LEARNING
 Donc on passed'une version tabulée de Q(s,a) à une fonction Q(s,a) qui se doit d'être continue,
 et qu'on produira par un réseau de neurone. 
 Le DQ_learning permet d'apprendre sur des reruns stockés en mémoire
 
 
-DEEEP DETERMINISTIC POLICY GRADIENT
+ ## DEEEP DETERMINISTIC POLICY GRADIENT
 
 
 
-SOFT ACTOR CRITIC
+## SOFT ACTOR CRITIC
 
 
-
-
-NEXT STEP: GARDER UNE GLISSE CONSTANTE DONC FCDG=POID
-
-
-NEXT STEP: METHODE GAUTHIER FROM TRAJECTORY TO STATE
-En fait mon kart doit toujours glisser, |gammaCdG|=poid n'est defini que par son cap, donc explorer tout les états possibles donnant tout les points d'un plan 2D (cap Gamma CdG,  MomentCdG).
-
-Ensuite travailler en reverse à partir de la trajectoire optimale pour trouver une séquence de moment CdG qui la permet 

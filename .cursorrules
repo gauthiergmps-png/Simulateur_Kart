@@ -1,3 +1,11 @@
-Ne jamais supprimer les commentaires existants, ajouter un flag OBSOLETE ou A METTRE A JOUR si nécessaire
-Ne jamais modifier l'aspect ou le style de mise en forme du code existant si la fonction est inchangée
-Ne se servir de messagebox uniquement pour afficher des messages d'erreur
+# Projet Kart simulator — conventions de code
+
+## Commentaires
+Ne jamais supprimer les commentaires existants. Si un commentaire est devenu faux ou trompeur, le conserver en le faisant précéder de « OBSOLETE: » ou « A METTRE A JOUR: », ou en mettant à jour son texte sans le supprimer.
+
+## Mise en forme
+Ne jamais modifier l’aspect ou le style de mise en forme du code existant si la logique de la fonction n’est pas modifiée (pas de reformatage gratuit : guillemets, coupures de lignes, espaces).
+
+## Tkinter — messagebox
+Ne se servir de `messagebox` que pour afficher des messages d’erreur (`messagebox.showerror`). 
+Ne pas utiliser `showinfo`, `showwarning`, `askyesno`, `askokcancel`, etc. 

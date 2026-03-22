@@ -23,13 +23,22 @@ Je code un programme d'exploration de Q pour voir ce qu'on a dedans après 20 00
 V1.2 - J'importe l'ancien projet 03-Circuit et Trajectoires dans un dossier dédié de ce projet, et je produit un fichier
        traj_1.json qui me permettra d'avoir une trajectoire cible
        
-V1.2.1: Trajectoire cible visualisée dans SimulUI et fonction ecart_trajectoire donnant les observables pertinent
-       Ajout d'une classe Kart_control pour héberger les modes de pilotage
+V1.2.1: Trajectoire cible visualisée dans SimulUI à partir d'un circuit ou d'une trajectoire produite par C_et_T,
+        fonction ecart_trajectoire donnant les observables pertinent, et ajout d'une classe Kart_control 
+        qui héberge des modes de pilotage
+
+V.1.2.2: J'ai ajouté un mode "Explore" qui permet de tabuler le comportement du Kart dans un espace d'états
+         et d'enregister un fichier visualisable dans ParaView: points = (cap, volant, gaz) et T=vitesse
+
        
 # TODO
 Hèlas toujours commencer par demander d'appliquer les cursorrules...
 
-Trajectoire: mettre un signe à la curvature
+Methode controle LG
+   Lire le fichier avec Paraview
+
+Améliorer le "proportionnel" en réglant les gaz
+et optimiser les gains par des runs AI
 
 Agent q_learning:
 Symétriser la matrice Q pour exploiter la symétrie du problème

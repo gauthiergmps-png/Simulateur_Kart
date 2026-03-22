@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
+  <Collection>
+    <DataSet timestep="0.0" file="kart_explore_20260322_183009_vit0.vtk"/>
+    <DataSet timestep="5.0" file="kart_explore_20260322_183009_vit5.vtk"/>
+    <DataSet timestep="10.0" file="kart_explore_20260322_183009_vit10.vtk"/>
+    <DataSet timestep="15.0" file="kart_explore_20260322_183009_vit15.vtk"/>
+    <DataSet timestep="20.0" file="kart_explore_20260322_183009_vit20.vtk"/>
+    <DataSet timestep="25.0" file="kart_explore_20260322_183009_vit25.vtk"/>
+    <DataSet timestep="30.0" file="kart_explore_20260322_183009_vit30.vtk"/>
+    <DataSet timestep="35.0" file="kart_explore_20260322_183009_vit35.vtk"/>
+    <DataSet timestep="40.0" file="kart_explore_20260322_183009_vit40.vtk"/>
+    <DataSet timestep="45.0" file="kart_explore_20260322_183009_vit45.vtk"/>
+    <DataSet timestep="50.0" file="kart_explore_20260322_183009_vit50.vtk"/>
+  </Collection>
+</VTKFile>

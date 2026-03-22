@@ -190,37 +190,6 @@ class Circuit(Profil):
             messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
             return False
 
-    @classmethod
-    def load_circuit_dialog(cls):
-        """Ouvre une boite de dialogue et charge un circuit (.csv ou .json)."""
-        filename = filedialog.askopenfilename(
-            initialdir=str(_dir_files_path()),
-            filetypes=[("All files", "*.*")]
-        )
-
-        if not filename:
-            return None
-
-        if not _is_within_dir_files(filename):
-            messagebox.showerror("Erreur", f"Lecture interdite hors de '{DIR_FILES}'.")
-            return None
-
-        try:
-            new_circuit = cls()
-            if filename.endswith('.csv'):
-                cls._load_circuit_csv(new_circuit, filename)
-            elif filename.endswith('.json'):
-                with open(filename, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                new_circuit.from_dict(data)
-            else:
-                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .csv ou .json).")
-                return None
-            return new_circuit
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
-            return None
-
     @staticmethod
     def _load_circuit_csv(circuit, filename):
         """Charge un circuit depuis un fichier CSV."""
@@ -409,35 +378,6 @@ class Trajectoire(Profil):
             messagebox.showerror("Erreur", f"Erreur lors de l'export: {e}")
             return False
 
-    @classmethod
-    def load_trajectory_dialog(cls):
-        """Ouvre une boite de dialogue et charge une trajectoire (.json uniquement)."""
-        filename = filedialog.askopenfilename(
-            initialdir=str(_dir_files_path()),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-
-        if not filename:
-            return None
-
-        if not _is_within_dir_files(filename):
-            messagebox.showerror("Erreur", f"Lecture interdite hors de '{DIR_FILES}'.")
-            return None
-
-        try:
-            new_traj = cls()
-            if filename.lower().endswith('.json'):
-                with open(filename, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                new_traj.from_dict(data)
-                return new_traj
-            else:
-                messagebox.showerror("Erreur", "Extension de fichier non supportée (utiliser .json).")
-                return None
-        except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
-            return None
-
     def calculate_velocities(self):
         """Calcule les vitesses maximales selon les courbures de la trajectoire"""
         if len(self.fine_points) == 0:
@@ -474,6 +414,57 @@ class Trajectoire(Profil):
             print("Optimisation 5")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances, 
             puissance_massique=40.*735/400, gmax=self.max_acceleration, vmax=self.max_velocity, is_closed=self.is_closed)
+
+def load_C_or_T__dialog():
+    """Ouvre une boîte de dialogue et charge un circuit ou une trajectoire (.csv ou .json).
+
+    Pour un JSON, la racine doit contenir ``circuit_data`` (circuit) ou ``traj_data`` (trajectoire),
+    comme produit par :meth:`Circuit.to_dict` / :meth:`Trajectoire.to_dict`.
+
+    Les fichiers CSV sont réservés au circuit (via :meth:`Circuit._load_circuit_csv`).
+
+    Retourne une instance de :class:`Circuit` ou :class:`Trajectoire`, ou ``None``.
+    """
+    filename = filedialog.askopenfilename(initialdir=str(_dir_files_path()),
+        filetypes=[("JSON files", "*.json"), ("CSV files", "*.csv"), ("All files", "*.*")])
+
+    if not filename:
+        return None
+
+    if not _is_within_dir_files(filename):
+        messagebox.showerror("Erreur", f"Lecture interdite hors de '{DIR_FILES}'.")
+        return None
+
+    try:
+        if filename.lower().endswith(".csv"):
+            messagebox.showerror("Erreur", f"Lecture fichiers non json encore à coder")
+            return None
+
+        if filename.lower().endswith(".json"):
+            with open(filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            has_traj = "traj_data" in data
+            has_circ = "circuit_data" in data
+            if has_traj and has_circ:
+                messagebox.showerror("Erreur JSON invalide : 'traj_data' et 'circuit_data' ne peuvent pas coexister.")
+                return None
+            if has_traj:
+                obj = Trajectoire()
+                obj.from_dict(data)
+                return obj
+            if has_circ:
+                obj = Circuit()
+                obj.from_dict(data)
+                return obj
+            messagebox.showerror("Erreur JSON sans clé 'traj_data' ni 'circuit_data' (format inconnu)" )
+            return None
+
+        messagebox.showerror("Erreur", "Extension non supportée (utiliser .csv ou .json).")
+        return None
+    except Exception as e:
+        messagebox.showerror("Erreur", f"Erreur lors du chargement: {e}")
+        return None
+
 
 def optimize_vitesse(curvatures, distances, puissance_massique=1000.,debug=False, 
                                          vtop=False, gmax=9.81, vmax=41.6, is_closed=True):
