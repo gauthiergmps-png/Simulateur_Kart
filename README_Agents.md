@@ -14,6 +14,31 @@ Existe t il déjà en chaque point de la trajectoire, un état de glisse du kart
 
 à priori oui, à vérifier, mais il faut aussi que le m_cdg soit raisonable..
 
+### Tabulation de la fonction Réponse du Kart
+J'ai donc tabulé la fonction F_cdg_x, f_cdg_y, m_cdg_z = F ( cap_V, volant, gaz/frein, V) en plusieurs .vtk, un par pas de module vitesse V.
+Donc pour un module V donné, j'ai la fonction F_v: 
+F_cdg_x, f_cdg_y, m_cdg_z = F_v ( cap_V, volant, gaz/frein) 
+
+En un point de trajectoire optimale, j'ai un couple vectoriel (F_cdg, Vitesse) à réaliser, donc:
+- J'ai a chercher que dans le .vtk correspondant à V module de la vitesse,
+- je ne veux que des f_cdg > 90% du poid
+- Je veux un angle précis entre F_cdg et vitesse, donc 
+
+Il me faut donc trouver le sous-ensemble du cube (cap_V, volant, gaz/frein) ces conditions et le visualiser
+pour avoir une idée des degrés de libertés qui me restent.
+
+Je peux par exemple tracer l'abaque correspondant aux deux paramètres fixe recherchés, qui sont (angle entre F et V) et (Module V), 
+et plotter sur x=Volant, Y=lacet l'ensemble des points atteignables, en y indiquant le m_cdg correspondant.
+
+
+
+
+
+
+
+
+
+
 
 Une glisse "stable" aura un f_cdg orthogonal à la vitese, j'aurai E_glisse_stable sous ensemble de E_glisse.
 

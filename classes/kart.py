@@ -18,6 +18,11 @@ class Mobile():
         # Variables statiques: Masse, poids et inertie:
         self.masse = masse             # Masse mobile en Kg
         self.inertie_lacet = inertie_lacet  # inertie en Lacet, Kgm²
+
+        # Variables des forces et moments
+        self.force_cdg = np.array([0., 0., 0.])   # force appliquée au cdg en repère absolu
+        self.moment_cdg = np.array([0., 0., 0.])  # moment appliqué au cdg en repère absolu
+
         self.init_state()
 
     def init_state(self, position=np.array([0., 0., 0.]), vitesse=np.array([0., 0., 0.]), 
@@ -28,9 +33,6 @@ class Mobile():
         self.angles = angles      # angles de Bryant (phi(z), teta(y), psi(x))
         self.vitangul = vitangul  # les vitesses angulaires en rd/s, attention, omega = np.flip(vitangul)
 
-        # Variables des forces et moments
-        self.force_cdg = np.array([0., 0., 0.])   # force appliquée au cdg en repère absolu
-        self.moment_cdg = np.array([0., 0., 0.])  # moment appliqué au cdg en repère absolu
 
     def _update_dynamique(self, dt):
         """ Propage la dynamique du mobile en fonction de la force appliquée au cdg et du moment appliqué au cdg """
@@ -83,7 +85,7 @@ class Kart(Mobile):
 
     Les methodes suivantes ont vocation à être appelées par la simulation:
     - init_state()
-    - update_parametres(h_cdg, ouverture, transm)  si on veut changer des paramètres sans reset
+    - init_parametres(h_cdg, ouverture, transm)  si on veut changer des paramètres sans reset
     - update_state(dt, volant, gaz, frein) pour propager l'état du kart à partir des contrôles
 
     Et pour un affichage:    
@@ -117,26 +119,10 @@ class Kart(Mobile):
         self.roue_arg = Wheel("ARG", self)
         self.roue_ard = Wheel("ARD", self)
 
-    def init_state(self, position=None, vitesse=None, angles=None, vitangul=None):
-        # Arguments optionnels comme dans Mobile.init_state (ligne 23) ; None = valeur par défaut
-        if position is None:
-            position = np.array([0., 0., 0.])
-        if vitesse is None:
-            vitesse = np.array([0., 0., 0.])
-        if angles is None:
-            angles = np.array([0., 0., 0.])
-        if vitangul is None:
-            vitangul = np.array([0., 0., 0.])
-        super().init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
-
-        # Variables des contrôles et réglages
-        self.transm=0        # Transmission: 0: roues independantes propulsion, 1: pont arrière rigide, 2: 4 Wheels intégral
-        self.h_cdg=0.               # hauteur du cdg par rapport au sol en % de l'empattement
+        # Variables des contrôle
         self.puis_mot=0.            # commande de puissance motrice (dérive de gaz demandé par simulation)
         self.frein=0          # commande de frein
-        self.ouverture=0.      # réglage d'ouverture
         self.volant=0.         # commande de volant en degrés
-        self.coul_chassis = 4  # couleur du chassis (4 = normal)
 
         # Variables des forces et moments
         self.tetag = 0.       # angle de braquage roue gauche en radians
@@ -152,6 +138,33 @@ class Kart(Mobile):
         self.gavd = 0 # glissement de la roue avant droite
         self.garg = 0 # glissement de la roue arrière gauche
         self.gard = 0 # glissement de la roue arrière droite
+
+        # initialisation état et paramètres du Kart, modifiables par la simulation
+        self.init_state()
+        self.init_parametres()
+
+    def init_state(self, position=None, vitesse=None, angles=None, vitangul=None):
+        # Arguments optionnels comme dans Mobile.init_state (ligne 23) ; None = valeur par défaut
+        if position is None:
+            position = np.array([0., 0., 0.])
+        if vitesse is None:
+            vitesse = np.array([0., 0., 0.])
+        if angles is None:
+            angles = np.array([0., 0., 0.])
+        if vitangul is None:
+            vitangul = np.array([0., 0., 0.])
+        super().init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
+
+    def init_parametres(self, h_cdg=0., ouverture=0, transm=0):
+        """ initialise ou met à jour les paramètres réglables du kart
+            indépendant du reset, car on peut ainsi modifier les paramètres sans reset pendant une simulation 
+            en mode interactif
+        """
+        self.h_cdg = h_cdg
+        self.transm=transm        # Transmission: 0: roues independantes propulsion, 1: pont arrière rigide, 2: 4 Wheels intégral
+        self.h_cdg=h_cdg               # hauteur du cdg par rapport au sol en % de l'empattement
+        self.ouverture = ouverture   # réglage d'ouverture
+        self.coul_chassis = 4        # couleur du chassis (4 = normal)
 
     @property   
     def profil_absolu(self):    
@@ -174,16 +187,6 @@ class Kart(Mobile):
         X_abs = vehicule2piste(X, self.angles[0]) + np.array([self.position[0], self.position[1], 0.])
         return list(X_abs[:, 0]), list(X_abs[:, 1]) # x,y du profil du kart en repère absolu
 
-    def update_parametres(self, h_cdg, ouverture, transm):
-        """ Met à jour les paramètres du kart
-            indépendant du reset, car on peut ainsi modifier les paramètres sans reset pendant une simulation 
-            en mode interactif
-        """
-
-        self.h_cdg = h_cdg
-        self.transm = transm
-        self.ouverture = ouverture
-    
     def _update_controles(self, volant, gaz, frein):
         """ Met à jour les contrôles du kart """
         self.puis_mot = 735.5 * gaz    # gaz recu en ch, on passe ici en puissance motrice en watt

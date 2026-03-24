@@ -37,7 +37,6 @@ class User_Interface:
         self.commandes = None
         self.command_radiobuttons = []
         self.circuit = 0
-        self.methode = None
         self.regul = None
         self.transm = None
         
@@ -83,13 +82,14 @@ class User_Interface:
         # Initialisation des variables Tkinter après création de la fenêtre
         self.commandes = IntVar()
         self.circuit = IntVar()
-        self.methode = IntVar()
         self.regul = IntVar()
         self.transm = IntVar()
         self.exp_cap = IntVar(value=0)
         self.exp_vit = IntVar(value=0)
         self.exp_vol = IntVar(value=0)
         self.exp_gaz = IntVar(value=0)
+        self_forcage_v=IntVar(value=0)
+        self.forcage_cap=IntVar(value=0)
         
         # Bandeau principal
         bandeau = Frame(self.fenetre, width=1800, height=100, highlightbackground="red", highlightthickness=2)
@@ -112,11 +112,11 @@ class User_Interface:
         # Frame A - Contrôle propagation
         self._create_propagation_frame(frames['frameA'])
         
-        # Frame 0 - Échelle affichage dynamique
-        self._create_dynamic_scale_frame(frames['frame0'])
+        # Frame 0 - LIBRE
+        self._create_frame0(frames['frame0'])
         
         # Frame 1 - Contrôle drone caméra
-        self._create_camera_frame(frames['frame1'])
+        self._create_dyn_and_camera_frame(frames['frame1'])
         
         # Frame 2 - Boutons RESET, PAUSE, QUIT
         self._create_control_buttons_frame(frames['frame2'])
@@ -172,20 +172,26 @@ class User_Interface:
                                  length=100, label="Pas de temps (ms)", orient=HORIZONTAL)
         self.pas_de_temps.set(0)
         self.pas_de_temps.pack()
-        
-        Label(frame, text="""Propagateur:""", justify=LEFT, padx=20).pack()
-        Radiobutton(frame, text="Euler", padx=20, variable=self.methode, value=0).pack(anchor=W)
-        Radiobutton(frame, text="Runge-Kutta 4", padx=20, variable=self.methode, value=1).pack(anchor=W)
-        self.methode.set(0)
     
-    def _create_dynamic_scale_frame(self, frame):
+        self.forcage_v = Scale(frame, from_=0, to=100, length=200, label="Forcage vitesse (m/s) si <>0", orient=HORIZONTAL)
+        self.forcage_v.set(0)
+        self.forcage_v.pack()
+
+        self.forcage_cap = Scale(frame, from_=0, to=100, length=200, label="Forcage cap vitesse (deg)", orient=HORIZONTAL)
+        self.forcage_cap.set(0)
+        self.forcage_cap.pack()
+        
+    def _create_frame0(self, frame):
+        pass
+
+    
+    def _create_dyn_and_camera_frame(self, frame):
         """Crée le frame d'échelle d'affichage dynamique"""
         self.echelle_dyn = Scale(frame, from_=0, to=5, length=100, 
                                 label="Aff. Dynamique", orient=HORIZONTAL)
         self.echelle_dyn.set(1.0)
         self.echelle_dyn.pack()
-    
-    def _create_camera_frame(self, frame):
+        
         """Crée le frame de contrôle de la caméra drone"""
         self.cam_alt = Scale(frame, from_=2, to=300, length=100, 
                             label="Altitude drone", orient=HORIZONTAL)
@@ -219,14 +225,13 @@ class User_Interface:
         self.circuit.set(0)
      
     def _create_steering_frame(self, frame):
-        """Crée le frame de contrôle du volant et hauteur CdG"""
-        self.volant_curseur = Scale(frame, from_=-45, to=45, length=200, 
-                                   label="Volant", orient=HORIZONTAL)
+        """Crée le frame de contrôle du volant et hauteur CdG, 
+           ainsi que deux curseurs de forcage du vecteur vitesse"""
+        self.volant_curseur = Scale(frame, from_=-45, to=45, length=200, label="Volant", orient=HORIZONTAL)
         self.volant_curseur.set(0)
         self.volant_curseur.pack()
         
-        self.H_cdg = Scale(frame, from_=0, to=100, length=200, 
-                          label="H CdG en %", orient=HORIZONTAL)
+        self.H_cdg = Scale(frame, from_=0, to=100, length=200, label="H CdG en %", orient=HORIZONTAL)
         self.H_cdg.set(0)
         self.H_cdg.pack()
 

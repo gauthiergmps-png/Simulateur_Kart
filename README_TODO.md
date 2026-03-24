@@ -29,6 +29,7 @@ V1.2.1: Trajectoire cible visualisée dans SimulUI à partir d'un circuit ou d'u
 
 V.1.2.2: J'ai ajouté un mode "Explore" qui permet de tabuler le comportement du Kart dans un espace d'états
          et d'enregister un fichier visualisable dans ParaView: points = (cap, volant, gaz) et T=vitesse
+         et l'ameliore l'observabilité de l'état du kart en pause, que je peux forcer en vitesse pendant la pause
 
        
 # TODO
@@ -37,7 +38,8 @@ Hèlas toujours commencer par demander d'appliquer les cursorrules...
 Methode controle LG
    Lire le fichier avec Paraview
 
-Améliorer le "proportionnel" en réglant les gaz
+Methode "proportionnel":
+Améliorer en réglant les gaz en fonction du virage à venir
 et optimiser les gains par des runs AI
 
 Agent q_learning:

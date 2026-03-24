@@ -74,7 +74,7 @@ class SimulationCore:
             h_cdg = kart_parametres['h_cdg']
             ouverture = kart_parametres['ouverture']
             transm = kart_parametres['transm']
-            self.kart.update_parametres(h_cdg, ouverture, transm)
+            self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm)
 
 
         volant = kart_controls['volant']
@@ -412,7 +412,9 @@ class SimulationUI(User_Interface):
             return int(origx + self.scale * x), int(origy + self.scale * y)
         
         # les axes d'affichages sont les mêmes axes que kart.position, à translation et échelle près
-        origx, origy = int(900 - self.scale * self.xcam), int(500 - self.scale * self.ycam) 
+        # offset_y = -100 pour affichage confortable sur portable
+        offset_y = -100
+        origx, origy = int(900 - self.scale * self.xcam), int(500 - self.scale * self.ycam + offset_y)
         xcdg, ycdg, _ = list(self.kart.position)
         lacet = self.kart.angles[0]
         
@@ -616,11 +618,11 @@ class SimulationUI(User_Interface):
                 self.cond_t0_recorded = data.get("conditions_t0", {})
                 parametres = data.get("parametres")
                 if isinstance(parametres, dict):
-                    # Si des paramètres dynamiques sont fournis, on les applique via Kart.update_parametres
+                    # Si des paramètres dynamiques sont fournis, on les applique via Kart.init_parametres
                     h_cdg = parametres.get("h_cdg", self.kart.h_cdg)
                     ouverture = parametres.get("ouverture", self.kart.ouverture)
                     transm = parametres.get("transm", self.kart.transm)
-                    self.kart.update_parametres(h_cdg, ouverture, transm)
+                    self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm)
             print(f"Commandes lues depuis '{path_cmd}'.")
             # Des commandes sont disponibles : on autorise le bouton REPLAY
             self.btn_replay.config(state="normal")
@@ -689,13 +691,15 @@ class SimulationUI(User_Interface):
            et enregister le résultat
         """
         # cap = angle entre la vitesse et l'axe x du Kart
-        cap_values = list(range(-90, 90, 10)) if self.exp_cap.get() else [0]
+        cap_values = list(range(-90, 90, 10)) if self.exp_cap.get() \
+                                                  else [self.forcage_cap.get()]
 
         # vit = vitesse du Kart en m/s
-        vit_values = (0, 5, 10, 15, 20, 25, 30, 35, 40,45, 50) if self.exp_vit.get() else [0]
+        vit_values = (0, 5, 10, 15, 20, 25, 30, 35, 40,45, 50) \
+                               if self.exp_vit.get() else [self.forcage_v.get()]
 
         # vol = angle entre le volant et l'axe x du Kart
-        vol_values = (-45, -35, -25, -15, -5, 0, 5, 15, 25, 35, 45) if self.exp_vol.get() else [0]
+        vol_values = list(range(-45, 50, 5)) if self.exp_vol.get() else [0]
 
         # gaz = commande frein ou gaz suivant le signe
         gaz_values = (-4, -3, -2, -1, 0, 10, 20, 30, 40, 50, 60, 70, 80) if self.exp_gaz.get() else [0]
@@ -797,11 +801,115 @@ class SimulationUI(User_Interface):
 
         except StopIteration:
             self.explore_status = False
+            # si on explorait les quatres dimensions, on sauvegarde dans un fichier vtk
+            if self.exp_cap.get() and  self.exp_vit.get() and self.exp_vol.get() and self.exp_gaz.get():
+                self._explore_write_paraview_vtk()
+            elif self.exp_vol.get() and self.exp_gaz.get():
+                # si on exploirait que deux dimensions, on va afficher la carte des états explorés
+                self._explore_display_map()
+            else:
+                print("Aucune exploration demandée")
 
-            self._explore_write_paraview_vtk()
             self._explore_gen = None
             self._explore_records = []
             self.after(1, self.animation_step)
+
+    def _explore_display_map(self):
+        """Carte (vol, gaz) des états explorés : affiche un graphique matplolib 
+        dans une nouvelle fenetre dont les données sont dans la liste self.explore_records. 
+        Un élément de cette liste est un point coloré dans un plan 'volant'/'gaz'
+        noir si la norme de Fcg inférieure à 80% du poid du kart, 
+        sinon rouge si Moment_cdg est négatif, vert s'il est positif
+        
+        Chaque enregistrement contient les données suivantes:
+        cap_deg: angle entre la vitesse et l'axe x du Kart
+                'vit': float(vit),  
+                'vol': float(vol),
+                'gaz': float(gaz),
+                'Fcdg_x': float(self.kart.force_cdg[0]),
+                'Fcdg_y': float(self.kart.force_cdg[1]),
+                'Moment_cdg_z': float(self.kart.moment_cdg[2]),
+        """
+        import matplotlib.pyplot as plt
+
+        recs = getattr(self, "_explore_records", None) or []
+        if not recs:
+            return
+
+        poids = float(self.kart.masse) * 9.81
+        seuil_norme = 0.8 * poids
+
+        xs, ys, colors = [], [], []
+        fxs, fys, mzs = [], [], []
+        for r in recs:
+            fx = float(r["Fcdg_x"])
+            fy = float(r["Fcdg_y"])
+            norme_f = float(np.hypot(fx, fy))
+            mz = float(r["Moment_cdg_z"])
+            if norme_f < seuil_norme:
+                c = "black"
+            elif mz < 0.0:
+                c = "red"
+            else:
+                c = "green"
+            xs.append(float(r["vol"]))
+            gaz = float(r["gaz"])
+            gaz = 10.*gaz if gaz < 0 else gaz
+            ys.append(gaz)
+            colors.append(c)
+            fxs.append(fx)
+            fys.append(fy)
+            mzs.append(mz)
+
+        def _arctan_fy_over_fx_deg(fx_i: float, fy_i: float) -> float:
+            if abs(fx_i) < 1e-15:
+                if abs(fy_i) < 1e-15:
+                    return float("nan")
+                return 90.0 if fy_i > 0 else -90.0
+            return float(np.degrees(np.arctan(fy_i / fx_i)))
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sc = ax.scatter(xs, ys, c=colors, s=150, edgecolors="none", picker=True, pickradius=14)
+        ax.set_xlabel("vol")
+        ax.set_ylabel("gaz")
+        ax.set_title("États explorés (noir : ‖Fcdg_xy‖ < 80 % du poids ; sinon rouge/vert selon Moment_cdg_z)")
+        ax.grid(True, alpha=0.3)
+
+        info = ax.text(
+            0.02, 0.98, "",
+            transform=ax.transAxes,
+            va="top",
+            ha="left",
+            fontsize=9,
+            family="monospace",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.85),
+        )
+
+        def _explore_map_point_label(i: int) -> str:
+            ang = _arctan_fy_over_fx_deg(fxs[i], fys[i])
+            ang_s = f"{ang:.2f}°" if np.isfinite(ang) else "—"
+            return f"Cap_F = {ang_s}\nMoment_Z = {mzs[i]:.6g}"
+
+        def _on_explore_map_mouse(event):
+            if event.inaxes != ax:
+                info.set_text("")
+                fig.canvas.draw_idle()
+                return
+            ok, props = sc.contains(event)
+            if ok and len(props.get("ind", [])) > 0:
+                idx = int(props["ind"][0])
+                info.set_text(_explore_map_point_label(idx))
+            else:
+                info.set_text("")
+            fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect("motion_notify_event", _on_explore_map_mouse)
+        fig.canvas.mpl_connect("button_press_event", _on_explore_map_mouse)
+
+        fig.tight_layout()
+        # Référence forte pour éviter la fermeture par le GC ; fenêtre indépendante, non bloquante pour Tk.
+        self._explore_map_figure = fig
+        plt.show(block=False)
 
     def _explore_write_paraview_vtk(self):
         """Écrit des VTK Legacy PolyData (ASCII) + un .pvd pour ParaView + un .json (même nom que le .pvd).
@@ -962,6 +1070,13 @@ class SimulationUI(User_Interface):
         else:
             F_com=0
             dt = 0.
+            # En pause, on peut forcer le vecteur vitesse si c'est demandé
+            forcage_v=self.forcage_v.get()
+            if forcage_v != 0:
+                cap_rad=np.radians(self.forcage_cap.get())
+                vitesse = np.array([forcage_v * np.cos(cap_rad), forcage_v * np.sin(cap_rad), 0.])
+                self.kart.init_state(position=self.kart.position, angles=self.kart.angles, vitesse=vitesse)
+
 
         # Propagation de l'état du kart par application des contrôles
         state = self.core.step(dt, kart_controls, simu_controls = simu_controls, kart_parametres = kart_parametres)
