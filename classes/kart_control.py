@@ -48,13 +48,33 @@ class Kart_control:
         self.p2 = p2
         self.p3 = p3
 
-    def control_proportionnel(self, manual_commands, observation):
+    def control_proportionnel(self, manual_commands, observations):
         """Asservissement P sur l'écart latéral (m) et l'écart angulaire (rad).
 
         Convention type README_Agents : correction de volant opposée à l'écart latéral.
         Sans trajectoire, l'appelant peut éviter d'utiliser ce mode ou passer des zéros.
         """
-        idx, ecart_lat, v_lat, curv, curv_N = observation
+        idx, ecart_lat, v_lat, v_traj, curv, curv_N = observations
+        # controle vitesse: on évalue la vitesse max liée à la courbure future de la trajectoire
+        # V² * curvature = Accel, donc Vmax = sqrt( g / curvature)     A CORRIGER RECUPERER PROPREMENT L'ADHERENCE'
+        frein = 2
+        v_max=1000.
+        if abs(curv_N) > 1e-4:
+            v_max = np.sqrt(9.81 / abs(curv_N))
+        if v_traj > 1 * v_max:
+            frein = 3
+        elif v_traj > 0.9 * v_max:
+            frein = 2
+        else:
+            frein = 0
+
+        # controle volant: on vise une vitesse latérale de rapprochement de gain*P3 m/s de signe opposé à l'écat_lat
+        gain=min(abs(ecart_lat),self.p2)/self.p2
+        v_cible= - np.sign(ecart_lat)*self.p3*gain
+        ecart_vlat=v_lat-v_cible
+
+        volant =  - self.p1 * ecart_vlat  * gain
+
         # logique gauthier: on vise une vitesse latérale de rapprochement de gain*P3 m/s de signe opposé à l'écat_lat
 
         # si on est écarté de plus de p2 m, gain saturé à p1, sinon décroissant linéairement en dessous de p2
@@ -65,7 +85,7 @@ class Kart_control:
         volant =  - self.p1 * ecart_vlat  * gain
         
         volant = float(np.clip(volant, -45., 45.0))
-        return {"volant": volant, "gaz": float(manual_commands['gaz']), "frein": float(manual_commands['frein'])}
+        return {"volant": volant, "gaz": float(manual_commands['gaz']), "frein": float(frein)}
 
     def control_qlearning(self, *args: Any, **kwargs: Any) -> Dict[str, float]:
         """Placeholder : politique Q-learning (à brancher)."""
@@ -80,23 +100,23 @@ class Kart_control:
         return {"volant": 0.0, "gaz": 0.0, "frein": 0.0}
 
     def compute_controls(self, mode: int, manual_commands: Dict[str, float], 
-                                   observation: Tuple[int, float, float, float, float]) -> Dict[str, float]:
+                                   observations: Tuple[int, float, float, float, float, float]) -> Dict[str, float]:
         """Point d'entrée pour les modes controlés (modes manuel et replay gérés dans SimulationUI)
            
            Arg:
                 manual_commands: dictionnaire descommandes manuelles proposées par l'UI:
                                 {"volant": 0.0, "gaz": 0.0, "frein": 0.0}
-                observation: écarts à la trajectoire = (idx, ecart_lat, v_lat_traj, curv, curv_N)
+                observations: écarts à la trajectoire = (idx, ecart_lat, v_lat_traj, v_traj, curv, curv_N)
 
            Return:
                 kart_controls: commandes volant, gaz, frein à appliquer au kart
         """
         if mode == self.MODE_PROPORTIONNEL:
-            return self.control_proportionnel(manual_commands, observation)
+            return self.control_proportionnel(manual_commands, observations)
         if mode == self.MODE_QLEARNING:
-            return self.control_qlearning(manual_commands, observation)
+            return self.control_qlearning(manual_commands, observations)
         if mode == self.MODE_AGENT_3:
-            return self.control_agent_3(manual_commands, observation)
+            return self.control_agent_3(manual_commands, observations)
         if mode == self.MODE_AGENT_4:
-            return self.control_agent_4(manual_commands, observation)
+            return self.control_agent_4(manual_commands, observations)
         return dict(manual_commands)

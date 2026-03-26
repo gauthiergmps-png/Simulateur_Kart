@@ -3,7 +3,8 @@ from abc import abstractmethod
 import numpy as np
 from tkinter import (Tk, Canvas, Frame, Button, LEFT, RIGHT, TOP, BOTTOM, 
                      CENTER, HORIZONTAL, VERTICAL, ARC, LAST, Label, Scale,
-                     Checkbutton, Radiobutton, IntVar, W, N, S)
+                     Checkbutton, Radiobutton, IntVar, StringVar, W, N, S, Entry,
+                     Spinbox)
 
 from classes.kart_control import Kart_control
 
@@ -44,6 +45,10 @@ class User_Interface:
         self.F_com = []
         self.t_cyclemax = 0.
         self.simul_pause=True
+
+        # variable d'enregistrement et de replay
+        self.record_status = False
+        self.replay_status = False
 
         # Mode d'exploration des états possibles
         self.explore_status = False
@@ -88,7 +93,6 @@ class User_Interface:
         self.exp_vit = IntVar(value=0)
         self.exp_vol = IntVar(value=0)
         self.exp_gaz = IntVar(value=0)
-        self_forcage_v=IntVar(value=0)
         self.forcage_cap=IntVar(value=0)
         
         # Bandeau principal
@@ -167,20 +171,27 @@ class User_Interface:
         self.commandes.set(0)
     
     def _create_propagation_frame(self, frame):
-        """Crée le frame de contrôle de propagation"""
-        self.pas_de_temps = Scale(frame, from_=0, to=300, tickinterval=0.01, 
+        """Crée le frame de contrôle de propagation et forcage de vitesse"""
+        # pas de tickinterval : les graduations sous un Scale horizontal laissent souvent une bande visuelle gênante
+        self.pas_de_temps = Scale(frame, from_=0, to=100,
                                  length=100, label="Pas de temps (ms)", orient=HORIZONTAL)
         self.pas_de_temps.set(0)
         self.pas_de_temps.pack()
     
-        self.forcage_v = Scale(frame, from_=0, to=100, length=200, label="Forcage vitesse (m/s) si <>0", orient=HORIZONTAL)
-        self.forcage_v.set(0)
-        self.forcage_v.pack()
+        Label(frame, text="Forcage vitesse (m/s) si <>0", justify=LEFT, padx=20).pack(anchor=W)
+        self.forcage_v = StringVar(value="0")
+        ent_fv = Entry(frame, textvariable=self.forcage_v, width=6, justify=CENTER)
+        ent_fv.pack()
+        for _seq in ("<Return>", "<KP_Enter>"):
+            ent_fv.bind(_seq, self._focus_canvas_after_field)
+    
+        Label(frame, text="Forcage cap vitesse (deg)", justify=LEFT, padx=20).pack(anchor=W)
+        # self.forcage_cap : IntVar déjà créé dans _create_control_panel (même plage 0..100 que l'ancien Scale)
+        sb_cap = Spinbox(frame, from_=0, to=100, increment=1, textvariable=self.forcage_cap, width=6)
+        sb_cap.pack()
+        for _seq in ("<Return>", "<KP_Enter>"):
+            sb_cap.bind(_seq, self._focus_canvas_after_field)
 
-        self.forcage_cap = Scale(frame, from_=0, to=100, length=200, label="Forcage cap vitesse (deg)", orient=HORIZONTAL)
-        self.forcage_cap.set(0)
-        self.forcage_cap.pack()
-        
     def _create_frame0(self, frame):
         pass
 
@@ -205,33 +216,44 @@ class User_Interface:
     
     def _create_control_buttons_frame(self, frame):
         """Crée le frame des boutons de contrôle"""
-        Button(frame, text="RESET", fg="green", command=self._handle_reset).pack(padx=10, pady=5, anchor=N)
-        Button(frame, text="PAUSE", fg="blue", command=self._handle_pause).pack(padx=10, pady=5, anchor=CENTER)
-        Button(frame, text="QUIT", fg="red", command=self._quit_application).pack(padx=10, pady=5, anchor=S)
+        Button(frame, text="RESET", fg="green", width=12,
+                                    command=self._handle_reset).pack(padx=10, pady=5, anchor=N)
+        Button(frame, text="PAUSE", fg="blue", width=12, 
+                                    command=self._handle_pause).pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="QUIT", fg="red", width=12, 
+                                    command=self._quit_application).pack(padx=10, pady=5, anchor=S)
 
     def _create_recorder_buttons_frame(self, frame):
         """Crée le frame des boutons du recorder"""
-        self.btn_record = Button(frame, text="RECORD", fg="green", command=self._handle_record)
+        # width en caractères (police du bouton) : assez large pour « RECORDING » sans élargir le frame
+        # Ne pas chaîner .pack() sur l'affectation : pack() retourne None.
+        self.btn_record = Button(frame, text="RECORD", fg="green", width=12,
+                                command=self._handle_record)
         self.btn_record.pack(padx=10, pady=5, anchor=N)
-        Button(frame, text="STOP", fg="blue", command=self._handle_stop).pack(padx=10, pady=5, anchor=CENTER)
-        self.btn_replay = Button(frame, text="REPLAY", fg="red", command=self._handle_replay, state="disabled")
+        Button(frame, text="STOP", fg="blue", width=12,
+                                 command=self._handle_stop).pack(padx=10, pady=5, anchor=CENTER)
+        self.btn_replay = Button(frame, text="REPLAY", fg="red", width=12,
+                           command=self._handle_replay, state="disabled")
         self.btn_replay.pack(padx=10, pady=5, anchor=CENTER)
-        Button(frame, text="READ", fg="black", command=self.read_commands).pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="READ", fg="black", width=12,
+                                command=self.read_commands).pack(padx=10, pady=5, anchor=CENTER)
 
     def _create_circuits_frame(self, frame):
-        """Crée le frame des commandes"""
-        Label(frame, text="""Circuit:""", justify=LEFT, padx=20).pack()
-        Button(frame, text="Load Trajectoire", fg="blue", command=self._handle_load_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
+        """Crée le frame trajectoire cible, qui peut être un circuit d'ailleurs"""
+        Label(frame, text="""Traj. cible:""", justify=LEFT, padx=20).pack()
+        Button(frame, text="LOAD", fg="blue", width=12, 
+                           command=self._handle_load_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
         self.circuit.set(0)
      
     def _create_steering_frame(self, frame):
         """Crée le frame de contrôle du volant et hauteur CdG, 
-           ainsi que deux curseurs de forcage du vecteur vitesse"""
-        self.volant_curseur = Scale(frame, from_=-45, to=45, length=200, label="Volant", orient=HORIZONTAL)
+         """
+ 
+        self.volant_curseur = Scale(frame, from_=-45, to=45, length=150, label="Volant", orient=HORIZONTAL)
         self.volant_curseur.set(0)
         self.volant_curseur.pack()
         
-        self.H_cdg = Scale(frame, from_=0, to=100, length=200, label="H CdG en %", orient=HORIZONTAL)
+        self.H_cdg = Scale(frame, from_=0, to=100, length=150, label="H CdG en %", orient=HORIZONTAL)
         self.H_cdg.set(0)
         self.H_cdg.pack()
 
@@ -280,6 +302,11 @@ class User_Interface:
         """Crée le canvas d'animation"""
         self.cnv = Canvas(self.fenetre, width=1800, height=1000, background="#003300")
         self.cnv.pack()
+
+    def _focus_canvas_after_field(self, event=None):
+        """Après Entrée dans un champ (Entry / Spinbox), rendre le focus au canvas pour les raccourcis."""
+        if self.cnv is not None:
+            self.cnv.focus_set()
     
     def _setup_key_bindings(self):
         """Configure les raccourcis clavier"""
@@ -334,6 +361,7 @@ class User_Interface:
     def _handle_replay(self):
         """Gère l'action de pause - appelle la méthode surchargée"""
         self.record_replay()
+        self.simul_pause = False
 
     @abstractmethod
     def reset(self):
@@ -353,10 +381,13 @@ class User_Interface:
         cette fonction se contente d'afficher les valeurs passées en arguments.
         """
         # Télémesure 1 (affichage direct des arguments formatés)
-        texteaff = ("SIMULATION "
+        text1="SIMULATION -   PAUSE  - " if self.simul_pause else "SIMULATION - RUNNING  -"
+        text2=" RECORDER - OFF -" if not self.record_status else " RECORDER -  ON - "
+        texteaff = (text1+
             f"N= {pas_simul:10}  T = {temps:6.2f}  "
-            f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "
-            f"F_com = {F_com:5d}")
+            f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "+
+            text2+
+            f" F_com = {F_com:5d}")
 
         self.telemesure1.config(text=str(texteaff))
 
@@ -379,7 +410,7 @@ class User_Interface:
         """Met à jour l'affichage de télémesure ligne 3
         """
         # Télémesure 3 (affichage direct des arguments formatés)
-        texteaff = ("KART INTERNE"
+        texteaff = ("KART INTERNE "
             f"Fcdg x ={f_cdg_x:^+10.2f}  Fcdg y ={f_cdg_y:^+10.2f}  Fcdg z ={f_cdg_z:^+10.2f} "
             f"F_cdg = {force_cdg:^+10.2f} Mcdg ={moment_cdg:^+10.2f}   Radius ={radius:^+10.2f} "
             f"Varbre = {varbre:^+10.2f}  Vstab = {vstab:^+10.2f}"

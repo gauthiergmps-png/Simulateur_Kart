@@ -35,12 +35,17 @@ V.1.2.2: J'ai ajouté un mode "Explore" qui permet de tabuler le comportement du
 # TODO
 Hèlas toujours commencer par demander d'appliquer les cursorrules...
 
-Methode controle LG
-   Lire le fichier avec Paraview
+Faire marcher un replay par defaut de 5 secondes.
+Mettre un indicateur de volant, le scale sert à rien
+remplacer le scale volant par une position cdg
 
+Methode controle LG
+   Lire le fichier avec Paraview, ou utiliser la fonction MAP... A travailler.
+
+rebaptiser kart_control en kart_pilotage
 Methode "proportionnel":
-Améliorer en réglant les gaz en fonction du virage à venir
-et optimiser les gains par des runs AI
+Pour passer l'épingle de duffort, il me faut peut être plus de points fins.
+et optimiser les paramètres du gains par des runs AI
 
 Agent q_learning:
 Symétriser la matrice Q pour exploiter la symétrie du problème

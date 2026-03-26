@@ -15,6 +15,8 @@ Je supprime la classe File_manager pour avoir les méthodes load et save directe
 
 Le nombre de fine_point pourra être déterminé pour être défini par la longueur du raw_circuit et avoir 1 pt/m
 
+et mettre des traj_data dans les fichiers des circuit, ca permet de jouer avec le centre piste
+
 A la lecture, il faut regénérer les data qu'on peut plutot que de relire le fichier
 
 suppression du 5ème PDP: j'ai un crash d'index sur le plus proche dès fois, à comprendre

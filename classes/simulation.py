@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import time
 from pathlib import Path
+from tkinter import TclError
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 RECORDS_DIR = PROJECT_DIR / "Records"
@@ -13,9 +14,19 @@ from classes.user_interface import User_Interface
 from classes.utils import vehicule2piste, piste2vehicule, norme_vecteur
 from C_et_T.C_et_T_classes.circuit_et_trajectoire import Circuit, load_C_or_T__dialog
 
-from typing import TYPE_CHECKING, Iterator, Optional, Tuple
+from typing import TYPE_CHECKING, Iterator, Optional, Tuple, Any
 if TYPE_CHECKING:
     from .kart import Kart
+
+
+def _safe_tk_var_float(var: Any, default: float = 0.0) -> float:
+    """Lit une Variable Tk (StringVar, IntVar, DoubleVar, etc.) sans lever si valeur absente ou invalide.
+    Spinbox / Entry reliés à un IntVar peuvent provoquer TclError sur .get() pendant la saisie."""
+    try:
+        return float(var.get())
+    except (TclError, ValueError, TypeError):
+        return float(default)
+
 
 class SimulationCore:
     """Cœur d'une simulation dynamique du Kart, sans UI.
@@ -23,16 +34,19 @@ class SimulationCore:
        et propage l'état du kart.
        L'environement extérieur doit donc:
           - propager l'état par la méthode step() de cette classe.
-          - observer les écarts à la trajectoire cible par la méthode ecarts_trajectoire() de cette classe.
+          - observer les écarts à la trajectoire cible par la méthode get_observations() de cette classe.
           - agir par la méthode de son choix sur les contrôles du kart.
     """
     def __init__(self, kart: "Kart"):
         self.kart = kart
-        #: Trajectoire cible issue d'une instance :class:`Trajectoire` ou :class:`Circuit` (partie profil).
+
+        #: Trajectoire cible: None si on en pas chargé, sinon c'estl'instance d'une classe 
+        # class:`Trajectoire` ou :class:`Circuit` dont la partie "profil" sera la trajectoire cible
         self.traj_cible = None
+
         #: Bordures du circuit (``circuit_data``), ou ``None`` si la traj_cible est une trajectoire seule.
-        self.left_border = None
-        self.right_border = None
+        self.left_border = None   # None si la traj_cible est une trajectoire seule, sinon liste des points de la bordure gauche
+        self.right_border = None  # None si la traj_cible est une trajectoire seule, sinon liste des points de la bordure droite
         self.reset()
     
     def reset(self):
@@ -56,17 +70,19 @@ class SimulationCore:
     
     def step(self, dt, kart_controls, simu_controls=None,kart_parametres=None):
         """Un pas de simulation physique (API sans SimulationUI).
+           Arguments:
+                  kart_controls : dict commandes pilote (volant, gaz, frein).
+                  simu_controls (optionnel): dict régulateur / asservissement (regul, vold).
+                  kart_parametres (optionnel): dict réglages kart (h_cdg, ouverture, transm).
 
-        kart_controls : dict commandes pilote (volant, gaz, frein).
-        
-        simu_controls (optionnel): dict régulateur / asservissement (regul, vold).
+            Return: un dict avec : pas_simul, temps, V, gaz, volant.
 
-        kart_parametres (optionnel): dict réglages kart (h_cdg, ouverture, transm).
 
-        Retourne un dict avec : pas_simul, temps, V, gaz, volant.
+        Simulcore offre une fonction régulation de  vitesse.
         """
-        self.pas_simul += 1
+
         if dt != 0.:
+            self.pas_simul += 1
             self.temps += dt
 
         # Mise à jour des paramètres du Kart pendant la simulation si ca nous amuse
@@ -123,17 +139,16 @@ class SimulationCore:
 
         self.reset()
 
-    def ecarts_trajectoire(self) -> Optional[Tuple[int, float, float, float, float]]:
+    def get_observations(self) -> Optional[Tuple[int, float, float, float, float, float]]:
         """Calcule les éléments observables suivant:
              - l'écart latéral entre la position actuelle du Kart et la trajectoire cible
              - la vitesse laterale du kart par rapport à la trajectoire
+             - la vitesse longitudinale du kart par rapport à la trajectoire
              - la courbature de la trajectoire au plus proche du kart,
              - la courbature de la trajectoire à X secondes devant le kart
 
-        Retour : ``(idx, ecart_lat, V_lat_traj, curv, curv_N)``, ou ``None`` si aucune traj_cible n'est chargée.
+        Retour : ``(idx, ecart_lat, V_lat_traj, V_traj, curv, curv_N)``, ou ``None`` si aucune traj_cible n'est chargée.
         """
-        if self.traj_cible is None or len(self.traj_cible.fine_points) == 0:
-            return None
 
         pos_xy = self.kart.position[0:2]  # on ne garde donc que 2 coordonnées dans le vecteur pos_xy
 
@@ -175,7 +190,7 @@ class SimulationCore:
             next_i += 1
         curv_N = self.traj_cible.curvatures[min(next_i, n_pts - 1)]
 
-        return int(idx), float(ecart), float(v_lat_traj), float(curv), float(curv_N)
+        return int(idx), float(ecart), float(v_lat_traj), float(v_traj), float(curv), float(curv_N)
 
 class SimulationUI(User_Interface):
     """Classe gérant la simulation manuelle avec interfaces utilisateurs Via Tkinter.
@@ -224,18 +239,12 @@ class SimulationUI(User_Interface):
         self.gaz = 0.
         self.frein = 0
 
-        # Variables d'observation de la trajectoire
-        self.idx = 0
-        self.ecart_lat = 0.
-        self.v_lat_traj = 0.
-        self.curv = 0.
-        self.curv_N = 0.
-
         # Variables du recorder
         self.record_status = False
         if not self.replay_status:
            self.controls_recorded = []
-        self.btn_record.config(text="RECORD", state="normal")
+        if self.btn_record:
+            self.btn_record.config(text="RECORD", state="normal")
 
         # Historique trajet
         self.hist_xcdg = []
@@ -603,6 +612,14 @@ class SimulationUI(User_Interface):
             self.cond_t0_recorded = None
             self.btn_record.config(text="RECORDING", state="disabled")
  
+    def _handle_stop(self):
+        """Arrête l'enregistrement ; active REPLAY si la mémoire contient au moins un pas."""
+        super()._handle_stop()
+        if len(self.controls_recorded) > 0:
+            self.btn_replay.config(state="normal")
+        else:
+            self.btn_replay.config(state="disabled")
+
     def read_commands(self):
         """Lit le fichier Records/commandes.txt et remplit controls_recorded + conditions_t0 (+ éventuels parametres) de replay."""
         path_cmd = RECORDS_DIR / "commandes.txt"
@@ -656,10 +673,10 @@ class SimulationUI(User_Interface):
             if position is not None or vitesse is not None or angles is not None or vitangul is not None:
                 self.kart.init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
     
-    def update_telemetry(self, V, F_com):
+    def update_telemetry(self, V, F_com, observations):
         """ Tous les calculs numériques sont faits ici, avant l'appel à show_telemetry de la classe User_Interface
         """
-
+        idx, ecart_lat, v_lat, v_traj, curv, curv_N = observations
         f_cdg_vec = piste2vehicule(self.kart.force_cdg, self.kart.angles[0])
         norme_f_cdg = norme_vecteur(f_cdg_vec)
 
@@ -673,17 +690,16 @@ class SimulationUI(User_Interface):
         vit_x, vit_y, _ = self.kart.vitesse
         lacet_deg = self.kart.angles[0] * 180.0 / np.pi
         v_lacet_deg = self.kart.vitangul[0] * 180.0 / np.pi
-        V_kmh = V * 3.6
+        V_kmh = V * 3.6    
         f_cdg_x, f_cdg_y, f_cdg_z = f_cdg_vec
         moment_cdg_z = self.kart.moment_cdg[2]
         varbre = self.kart.v_arbre
-        vstab = float(np.dot(f_cdg_vec, vehicule2piste(self.kart.vitesse, self.kart.angles[0])))
         
         self.show_telemetry_1(self.core.pas_simul, self.core.temps, t_cyclemax_ms, t_framemax_ms, F_com)
 
         self.show_telemetry_2(pos_x, pos_y, vit_x, vit_y, lacet_deg, v_lacet_deg, V, V_kmh, 
-                             self.core.vold, self.idx, self.ecart_lat ,self.v_lat_traj, self.curv, self.curv_N)
-        self.show_telemetry_3(f_cdg_x, f_cdg_y, f_cdg_z, norme_f_cdg, moment_cdg_z, radius, varbre, vstab)    
+                             self.core.vold, idx, ecart_lat ,v_traj, curv, curv_N)
+        self.show_telemetry_3(f_cdg_x, f_cdg_y, f_cdg_z, norme_f_cdg, moment_cdg_z, radius, varbre, 0.)    
 
     def _explore_combinations_gen(self) -> Iterator[Tuple[float, int, int, int]]:
         """Genérateur produisant les combinaisons demandées du tuple (cap, vit, volant, gaz) 
@@ -692,11 +708,11 @@ class SimulationUI(User_Interface):
         """
         # cap = angle entre la vitesse et l'axe x du Kart
         cap_values = list(range(-90, 90, 10)) if self.exp_cap.get() \
-                                                  else [self.forcage_cap.get()]
+                                                  else [_safe_tk_var_float(self.forcage_cap)]
 
         # vit = vitesse du Kart en m/s
         vit_values = (0, 5, 10, 15, 20, 25, 30, 35, 40,45, 50) \
-                               if self.exp_vit.get() else [self.forcage_v.get()]
+                               if self.exp_vit.get() else [_safe_tk_var_float(self.forcage_v)]
 
         # vol = angle entre le volant et l'axe x du Kart
         vol_values = list(range(-45, 50, 5)) if self.exp_vol.get() else [0]
@@ -997,6 +1013,13 @@ class SimulationUI(User_Interface):
 
         print(f"Exploration enregistrée : ParaView {pvd_path} ; métadonnées {json_path}")
 
+    def show_controls(self, kart_controls):
+        """Affiche les commandes du kart définies par un mode non manuel dans l'UI"""
+        self.volant = kart_controls['volant']
+        self.volant_curseur.set(kart_controls['volant'])
+        self.gaz = kart_controls['gaz']
+        self.frein = kart_controls['frein']
+
     def animation_step(self):
         """Effectue une étape d'animation (UI + core)
         Ne pas confondre une étape d'animation (L'affichage a lieu et se rafraichi, index N augmente
@@ -1011,57 +1034,56 @@ class SimulationUI(User_Interface):
         t0_frame = time.time()  
         t_frame=0.
 
-        # Récupération des contrôles et paramètres de la simulation à partir de l'interface utilisateur
-        simu_controls = {
-            'regul': bool(self.regul.get()),
-            'vold': getattr(self, 'Vold', 0.),
-        }
+        # 1 - RECUPERATION DES CONTROLES DE SIMULATION ET PARAMETRES DU KART
+        # contrôles de la simulation à partir de l'interface utilisateur
+        simu_controls = {'regul': bool(self.regul.get()), 'vold': getattr(self, 'Vold', 0.),}
         # Paramètres du kart (hauteur CdG, ouverture arrière, mode transmission) — lus sur l'UI
-        kart_parametres = {
-            'h_cdg': self.kart.empattement / 100. * self.H_cdg.get(),
-            'ouverture': self.ouverture.get(),
-            'transm': self.transm.get(),
-        }
+        kart_parametres = { 'h_cdg': self.kart.empattement / 100. * self.H_cdg.get(),
+                        'ouverture': self.ouverture.get(),
+                           'transm': self.transm.get(), }
 
-        # Evaluation Écarts trajectoire 
-        observation = self.core.ecarts_trajectoire()
-        if observation is None:
-            self.idx, self.ecart_lat, self.v_lat_traj, self.curv, self.curv_N = (0, 0.0, 0.0, 0.0, 0.0)
+        # Écarts trajectoire (tuple attendu par Kart_control ; pas de trajectoire → zéros)
+        if self.core.traj_cible is not None and len(self.core.traj_cible.fine_points) > 0:
+            observations = self.core.get_observations()
         else:
-            self.idx, self.ecart_lat, self.v_lat_traj, self.curv, self.curv_N = observation
+            observations = (0, 0., 0., 0., 0., 0.)
 
-        # Récupération des contrôles du kart à partir de l'enregistrement ou de l'interface utilisateur
+        # 2 - CONSTRUCTION DU CONTROLE DU KART
+        #  Si on est en mode replay, à partir de l'enregistrement
         if self.replay_status and self.core.pas_simul < len(self.controls_recorded):
             kart_controls = self.controls_recorded[self.core.pas_simul]
-        else:
-            if self.replay_status:
-                self.replay_status = False  # si on vient de finir un fichier de replay, fin du replay
+            self.show_controls(kart_controls)
 
+        else:
+            # sinon, lisons déjà les commandes demandées à partir de l'interface utilisateur
+            if self.replay_status:
+                # si on sort juste du mode replay par épuisement de controls_recorded, 
+                # on arrête le replay et on met la simulation en pause
+                self.replay_status = False
+                self.simul_pause = True
+
+            # Mode de contrôle demandé par l'utilisateur: Manuel ou agent de pilotage ?
             mode = int(self.commandes.get())
             manual_commands = {'volant': float(self.volant_curseur.get()),'gaz': self.gaz,'frein': self.frein}
 
             if mode == Kart_control.MODE_MANUEL:
+                # mode manuel: on applique directement les commandes demandées par l'utilisateur
                 kart_controls = manual_commands
             elif mode == Kart_control.MODE_PROPORTIONNEL:
+                # mode proportionnel: on applique les gains demandés dans l'UI
                 self.kart_control.set_gains(self.ass_p1.get(), self.ass_p2.get(), self.ass_p3.get())
-                kart_controls = self.kart_control.compute_controls(mode, manual_commands, observation)
-                self.volant = kart_controls['volant']
-                self.volant_curseur.set(kart_controls['volant'])
+                kart_controls = self.kart_control.compute_controls(mode, manual_commands, observations)
+                self.show_controls(kart_controls)
             else:
-                kart_controls = self.kart_control.compute_controls(mode, manual_commands, observation)
-                self.volant = kart_controls['volant']
-                self.volant_curseur.set(kart_controls['volant'])
+                kart_controls = self.kart_control.compute_controls(mode, manual_commands, observations)
+                self.show_controls(kart_controls)
 
-
-
-        # ON avance de dt, qui sera mis à zero si la simulation est en pause
-        dt = self.pas_de_temps.get() / 1000.
-        t0_cycle = time.time()
-
+        # 3 - ENREGISTREMENT DES CONTROLES, FORCAGE VITESSE POSSIBLE EN PAUSE
         if not self.simul_pause:     
-            # Enregistrement des oontroles si record on.On affiche le remplissage ou le vidage de la mémoire de commandes
+            # Enregistrement des oontroles si record on
             if self.record_status:
                 self.controls_recorded.append(kart_controls)
+                # F_com permet d'afficher le remplissage ou le vidage de la mémoire de commandes
                 F_com=len(self.controls_recorded)
             elif self.replay_status:
                 F_com=len(self.controls_recorded)-self.core.pas_simul
@@ -1069,32 +1091,34 @@ class SimulationUI(User_Interface):
                 F_com=0
         else:
             F_com=0
-            dt = 0.
-            # En pause, on peut forcer le vecteur vitesse si c'est demandé
-            forcage_v=self.forcage_v.get()
-            if forcage_v != 0:
-                cap_rad=np.radians(self.forcage_cap.get())
+            # En pause, on peut forcer le vecteur vitesse si c'est demandé avec une vitesse non nulle
+            forcage_v = _safe_tk_var_float(self.forcage_v)
+            if forcage_v > 0.1:
+                forcage_cap = _safe_tk_var_float(self.forcage_cap)
+                cap_rad=np.radians(forcage_cap)
                 vitesse = np.array([forcage_v * np.cos(cap_rad), forcage_v * np.sin(cap_rad), 0.])
                 self.kart.init_state(position=self.kart.position, angles=self.kart.angles, vitesse=vitesse)
 
+        # 4 - AVANCEMENT DE LA SIMULATION, NOUVEL ETAT DU KART
+        # On avance de dt, mis à zero si la simulation est en pause
+        dt = self.pas_de_temps.get() / 1000. if not self.simul_pause else 0.
+        t0_cycle = time.time()
 
-        # Propagation de l'état du kart par application des contrôles
+        # Evolution de l'état du kart par application des contrôles (dt=0 en pause)
         state = self.core.step(dt, kart_controls, simu_controls = simu_controls, kart_parametres = kart_parametres)
         V = state['V']
 
         if self.core.temps > 1.:
             t_cycle = time.time() - t0_cycle # temps du step physique uniquement 
             self.t_cyclemax = max(t_cycle, self.t_cyclemax)
-        # Mise à jour position caméra
+
+        # 5 - MISE A JOUR DE L'AFFICHAGE 
         self.scale = self.cam_alt.get()
         self.update_camera_position(self.kart.position)
-        
-        # Affichage
         self.dessin_canvas(self.echelle_dyn.get())
-        
-        # Mise à jour télémesures
-        self.update_telemetry(V, F_com)      
+        self.update_telemetry(V, F_com, observations) 
 
+        # 6 - PROGRAMMATION DE LA PROCHAINE ETAPE
         # Temps de cycle max = temps réel d'une frame (step + caméra + dessin + télémesure), en secondes
         t_frame = time.time() - t0_frame
         if not self.simul_pause and self.core.temps > 1.:
