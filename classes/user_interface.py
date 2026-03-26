@@ -243,7 +243,9 @@ class User_Interface:
         Button(frame, text="LOAD", fg="blue", width=12, 
                            command=self._handle_load_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
         self.circuit.set(0)
-     
+
+        Button(frame, text="CLEAR", fg="blue", width=12, 
+                           command=self._handle_clear_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
     def _create_balancing_frame(self, frame):
         """Crée le frame de contrôle de position et hauteur CdG, 
          """
@@ -354,6 +356,11 @@ class User_Interface:
 
     def _handle_load_T_or_C(self):
         """Gère l'action de chargement de la trajectoire cible
+        Sera chargé dans la classe SimulationUI"""
+        pass
+
+    def _handle_clear_T_or_C(self):
+        """Gère l'action de suppression de la trajectoire cible
         Sera chargé dans la classe SimulationUI"""
         pass
 

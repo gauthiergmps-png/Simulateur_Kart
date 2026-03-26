@@ -140,6 +140,13 @@ class SimulationCore:
 
         self.reset()
 
+    def clear_T_or_C(self):
+        """Supprime la trajectoire cible et les bordures"""
+        self.traj_cible = None
+        self.left_border = None
+        self.right_border = None
+        self.reset()
+
     def get_observations(self) -> Optional[Tuple[int, float, float, float, float, float]]:
         """Calcule les éléments observables suivant:
              - l'écart latéral entre la position actuelle du Kart et la trajectoire cible
@@ -403,8 +410,13 @@ class SimulationUI(User_Interface):
 
     def _handle_load_T_or_C(self):
         """Gère l'action de chargement de la trajectoire cible
-        Sera chargé dans la classe SimulationUI"""
+        """
         self.core.load_T_or_C()
+
+    def _handle_clear_T_or_C(self):
+        """Gère l'action de suppression de la trajectoire cible
+        """
+        self.core.clear_T_or_C()
     
     def dessin_canvas(self,kc):
         """Fonction de dessin du canvas à chaque pas"""

@@ -241,7 +241,7 @@ class Trajectoire(Profil):
         self.max_velocity = max_velocity          # m/s 41.6 m/s, soit 150Km/h
         self.velocities = []                     # Vitesses en chaque point
         self.type_accel = []                     # Type d'accélération en chaque point
-        self.optimization_type = 1              # Type d'optimisation
+        self.speed_compute_type = 1              # Methode de calcul des vitesses
         self.lap_time = 0.0                      # Temps au tour
         
     def reset_fine_profile(self):
@@ -393,31 +393,31 @@ class Trajectoire(Profil):
         self.velocities = []
         
         # METHODE 1 - COURBURES ONLY, ACCEL TANGENTIELLE INFINIE
-        if self.optimization_type == 1:
+        if self.speed_compute_type == 1:
             print("Optimisation 1")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances, vtop=True,
             gmax=self.max_acceleration, vmax=self.max_velocity, is_closed=self.is_closed)
         
         # METHODE 2 - COURBURES ET DISTANCES, ACCELERATION 1G MAX
-        elif self.optimization_type == 2:
+        elif self.speed_compute_type == 2:
             print("Optimisation 2")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances,
             gmax=self.max_acceleration, vmax=self.max_velocity, is_closed=self.is_closed)
         
         # METHODE 3 - COURBURES ET DISTANCES, PUISSANCE LIMITEE 120ch - SUPERSPRINT
-        elif self.optimization_type == 3:
+        elif self.speed_compute_type == 3:
             print("Optimisation 3")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances, 
             puissance_massique=120.*735/400, is_closed=self.is_closed)
 
         # METHODE 4 - COURBURES ET DISTANCES, PUISSANCE LIMITEE 80ch - MAXI SPRINT
-        elif self.optimization_type == 4:
+        elif self.speed_compute_type == 4:
             print("Optimisation 4")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances, 
             puissance_massique=80.*735/400, gmax=self.max_acceleration, vmax=self.max_velocity, is_closed=self.is_closed)
 
         # METHODE 5 - COURBURES ET DISTANCES, PUISSANCE LIMITEE 40ch - JUNIOR SPRINT
-        elif self.optimization_type == 5:
+        elif self.speed_compute_type == 5:
             print("Optimisation 5")
             self.velocities, self.type_accel = optimize_vitesse(self.curvatures, self.distances, 
             puissance_massique=40.*735/400, gmax=self.max_acceleration, vmax=self.max_velocity, is_closed=self.is_closed)
@@ -475,6 +475,11 @@ def load_C_or_T__dialog():
 
 def optimize_vitesse(curvatures, distances, puissance_massique=1000.,debug=False, 
                                          vtop=False, gmax=9.81, vmax=41.6, is_closed=True):
+    """ Calcule les vitesses maximales selon les courbures de la trajectoire
+    
+    
+    
+    """
     # Optimisation de la vitesse sur un tracé donné. Pas simple.
     # pas mal de travail fait pour que ca marche avec un circuit fermé, ouvert,....
 
@@ -615,12 +620,19 @@ def optimize_vitesse(curvatures, distances, puissance_massique=1000.,debug=False
             if (curvatures[j-1] > curvatures[j]): freinage =False   # en remontant au point d'avant, si la courbure remonte, on est au début du freinage
             j=j-1
     if debug: print("fin traitement freinage")   
-    
+
+    # VERIFICATIONS DE COHERENCE:
     # Si ce programme a bien marché, les vitesses sont bien renseignées sur tout les troncons, ce qu'on vérifie:
     if is_closed: 
         mask = np.abs(vitesse[1:]) < 1e-6  # booléen : True si "presque nul"
     else:
         mask = np.abs(vitesse) < 1e-6  # booléen : True si "presque nul"
-    if np.any(mask): print("ATTENTION: DES TRONCONS VITESSE NULLE: ", np.where(mask)[0])
-    
+    if np.any(mask): print("ERREUR: DES TRONCONS VITESSE NULLE: ", np.where(mask)[0])
+
+    # vérifions aussi s'il y a des discontinuités de vitesse:
+    diff_warning = 10. * np.mean(abs(np.diff(vitesse)))
+    if np.any(np.diff(vitesse) > diff_warning): 
+        print("ERREUR: DES DISCONTINUITES DE VITESSE: ", np.where(np.diff(vitesse) > diff_warning)[0])
+
+
     return vitesse, type_accel

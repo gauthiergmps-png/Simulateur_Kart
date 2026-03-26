@@ -74,7 +74,8 @@ class CircuitSimulator:
         self.root.after_idle(self._startup_canvas_and_plot)
 
     def _reset_model_background_image(self):
-        """Efface l'image modèle (nouveau circuit ou chargement d'un autre fichier). Hors saisie, l'image reste en mémoire pour réaffichage."""
+        """Efface l'image modèle (nouveau circuit ou chargement d'un autre fichier). 
+        Hors saisie, l'image reste en mémoire pour réaffichage."""
         if self.image_manager:
             self.image_manager.reset_image()
 
@@ -142,8 +143,8 @@ class CircuitSimulator:
         ttk.Button(trajectory_frame, text="Nouvelle Trajectoire", command=self.new_trajectory).pack(fill=tk.X, pady=2)
         self.pdp_input_button = ttk.Button(trajectory_frame, text="Saisie PDP", command=self.toggle_pdp_input)
         self.pdp_input_button.pack(fill=tk.X, pady=2)
-        ttk.Button(trajectory_frame, text="Calculer Trajectoire", command=lambda: self.calculate_trajectory(stop=True)).pack(fill=tk.X, pady=2)
-        ttk.Button(trajectory_frame, text="Optimiser Trajectoire", command=self.optimisation_method).pack(fill=tk.X, pady=2)
+        ttk.Button(trajectory_frame, text="Calculer Trajectoire fine", command=lambda: self.calculate_trajectory(stop=True)).pack(fill=tk.X, pady=2)
+        ttk.Button(trajectory_frame, text="Calculer vitesse", command=self.speed_compute_method).pack(fill=tk.X, pady=2)
         ttk.Button(trajectory_frame, text="Charger Trajectoire", command=self.load_trajectory).pack(fill=tk.X, pady=2)
         self.traj_save_button= ttk.Button(trajectory_frame, text="Sauvegarder Trajectoire", command=self.save_trajectory)
         self.traj_save_button.pack(fill=tk.X, pady=2)
@@ -679,7 +680,7 @@ class CircuitSimulator:
         if self.trajectory.is_ready_for_calculation():
             self.trajectory_info_label.config(text=f"Trajectoire calculée: {len(self.trajectory.fine_points)} points "
                                       f"\nLongueur:    : {self.trajectory.length:.2f} m"
-                                      f"\nType d'optimisation: {self.trajectory.optimization_type}"
+                                      f"\nType d'optimisation: {self.trajectory.speed_compute_type}"
                                       f"\nTemps au tour: {self.trajectory.lap_time:.2f} s")
         if self.circuit.input_mode:
             self.circuit_save_button.config(state='disabled')
@@ -718,11 +719,12 @@ class CircuitSimulator:
                 self.pdp_input_button.config(state='normal')
             self.instructions_label.config(text="Trajectoire verrouillée. Cliquez pour déverrouiller.")
             
-    def optimisation_method(self):
-        """Selection du type d'optimisation de a trajectoire"""
-        if len(self.circuit.fine_points) == 0:
-            messagebox.showerror("Erreur", "Créez d'abord un circuit fin")
-            return
+    def speed_compute_method(self):
+        """Selection de la méthode de calcul des vitesses par point de a trajectoire
+         ICI ON NE CALCULE QUE LES VITESSES SUIVANT DIVERSES CONTRAINTE
+        L'OPTIMISATION, CA SERA QUAND ON DEPLACERA DES PDP
+
+        """
         
         # Créer une fenêtre de dialogue pour choisir le type d'optimisation
         dialog = tk.Toplevel(self.root)
@@ -739,26 +741,26 @@ class CircuitSimulator:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Titre
-        title_label = ttk.Label(main_frame, text="Choisissez le type d'optimisation :", 
+        title_label = ttk.Label(main_frame, text="Choisissez le type de stratégie calcul vitesse:", 
                                font=('Arial', 12, 'bold'))
         title_label.pack(pady=(0, 20))
         
         # Variable pour stocker le choix
-        optimization_type = tk.IntVar(value=self.trajectory.optimization_type)
+        strategy_type = tk.IntVar(value=self.trajectory.speed_compute_type)
         
         # Types d'optimisation disponibles
-        optimization_types = [
-            ("Optimisation 1 - Vmax = sqrt (g / R)", 1),
-            ("Optimisation 2 - plus limitation 1g", 2),
-            ("Optimisation 3 - plus limitation 120 ch", 3), 
-            ("Optimisation 4 - plus limitation 80 ch", 4),   
-            ("Optimisation 5 - plus limitation 40 ch", 5), 
+        strategy_types = [
+            ("Strategie 1 - 1g max en Y donc V=sqrt(g/R)", 1),
+            ("Strategie 2 - 1g max en Y et en X", 2),
+            ("Strategie 3 - 1g max et limite à 120 ch", 3), 
+            ("Strategie 4 - 1g max et limite à 80 ch", 4),   
+            ("Strategie 5 - 1g max et limite à 40 ch", 5), 
 
         ]
         
         # Créer les boutons radio
-        for text, value in optimization_types:
-            radio_button = ttk.Radiobutton(main_frame, text=text, variable=optimization_type, 
+        for text, value in strategy_types:
+            radio_button = ttk.Radiobutton(main_frame, text=text, variable=strategy_type, 
                                          value=value)
             radio_button.pack(anchor=tk.W, pady=5)
         
@@ -767,13 +769,12 @@ class CircuitSimulator:
         button_frame.pack(fill=tk.X, pady=(20, 0))
         
         # Bouton Annuler
-        cancel_button = ttk.Button(button_frame, text="Annuler", 
-                                 command=dialog.destroy)
+        cancel_button = ttk.Button(button_frame, text="Annuler", command=dialog.destroy)
         cancel_button.pack(side=tk.RIGHT, padx=(10, 0))
         
         # Bouton Valider
         def validate_choice():
-            self.trajectory.optimization_type = optimization_type.get()
+            self.trajectory.speed_compute_type = strategy_type.get()
             dialog.destroy()
             self.trajectory.calculate_parameters()
         
@@ -790,11 +791,12 @@ class CircuitSimulator:
         # Attendre que la fenêtre soit fermée
         dialog.wait_window()
         
-        # Mettre à jour le graphique et les informations après optimisation
+        # Mettre à jour le graphique et les informations après calculs vitesses
         self.update_plot(False)
             
     def update_plot(self, motion=False):
-        """Met à jour le graphique. motion conservé pour les appelants (ex. calculate_*), sans masquer la trajectoire optimisée."""
+        """Met à jour le graphique. motion conservé pour les appelants (ex. calculate_*), 
+        sans masquer la trajectoire optimisée."""
         self.update_instructions_and_buttons()
         self.ax.clear()
         self.ax.grid(True, alpha=0.3)
@@ -844,7 +846,7 @@ class CircuitSimulator:
                 if self.circuit.is_closed : right_border = np.vstack([right_border, right_border[0]])
                 self.ax.plot(right_border[:, 0], right_border[:, 1], 'g-', linewidth=1)
                            
-        # Afficher la trajectoire grossière = es points de passage
+        # Afficher la trajectoire grossière = les points de passage PDP
         if self.trajectory.raw_points and self.trajectory.input_mode:
             pdp_points = np.array(self.trajectory.raw_points)
             self.ax.scatter(pdp_points[:, 0], pdp_points[:, 1], c='orange', s=100, marker='s', zorder=6)
@@ -857,8 +859,10 @@ class CircuitSimulator:
             if len(pdp_points) > 0:
                 nbpt = len(pdp_points) # if len(pdp_points) <3 else len(pdp_points) -1 # pour circuit fermé en fait,  A FAIRE
                 for i in range(nbpt):
-                    self.ax.text(pdp_points[i,0]+1, pdp_points[i,1]+1, f'{i+1}', fontsize=10, weight='bold',
-                           bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))   
+                    ecartement=2
+                    self.ax.text(pdp_points[i,0]+ecartement, pdp_points[i,1]+ecartement, f'{i+1}', 
+                    fontsize=10,  weight='bold',
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))   
 
         # Afficher la trajectoire s'il y en a une (en cours de saisie ou calculée)
         if len(self.trajectory.fine_points) > 0:
@@ -868,13 +872,14 @@ class CircuitSimulator:
             else:
                 traj_points_ext = traj_points
             self.ax.plot(traj_points_ext[:, 0], traj_points_ext[:, 1], 'b-', linewidth=1)
-            # Affiche les points de trajectoires colorés selon la vitesse, plus quelques vitesses
+
+            # Affiche les points de trajectoires colorés selon la vitesse, plus quelques labels vitesses
             if len(self.trajectory.velocities) > 0:
                 # Mapping des types d'accélération vers les couleurs
                 color_map = {
                     0: 'blue',    # Vitesse saturée à Vmax
-                    1: 'brown',   # Accélération limitée par adhérence (=patinage)
-                    2: 'green',   # Accélération limitée par puissance (=grip)
+                    2: 'brown',   # Accélération limitée par puissance (=grip)
+                    1: 'green',   # Accélération limitée par adhérence (=patinage)
                     3: 'grey',    # Levée de pied
                     4: 'red'      # Freinage
                 }
@@ -888,8 +893,8 @@ class CircuitSimulator:
                            markersize=6, label=texte)
                     for k, texte in (
                         (0, 'Vitesse saturée à Vmax'),
-                        (1, 'Accélération limitée par adhérence (=patinage)'),
-                        (2, 'Accélération limitée par puissance (=grip)'),
+                        (1, 'Accél. limitée par adhérence (=patinage)'),
+                        (2, 'Accél. limitée par puissance'),
                         (3, 'Levée de pied'),
                         (4, 'Freinage'),
                     )
@@ -918,9 +923,9 @@ class CircuitSimulator:
                     self.ax.annotate(
                         f'{v_kmh:.0f} km/h',
                         (traj_points[hi, 0], traj_points[hi, 1]),
-                        xytext=(16, 18),
+                        xytext=(20, 20),   # ecartement du label par rapport au point
                         textcoords='offset points',
-                        fontsize=9,
+                        fontsize=10,
                         fontweight='bold',
                         color='darkviolet',
                         bbox=dict(boxstyle='round,pad=0.35', facecolor='khaki', edgecolor='darkviolet', alpha=0.92),

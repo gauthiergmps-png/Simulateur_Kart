@@ -12,11 +12,13 @@ V1.2 - Mars 2026: Importation dans le projet Kart Simulator, donc n° Version gl
 Je supprime la classe File_manager pour avoir les méthodes load et save directement dans les classes Circuit et Trajectoire
 
 V.1.2.3: Le nombre de fine_point est défini par la longueur du raw_circuit et on a au moins 1 pt/m
+         L'affichage passe en +Y vers le bas, en cohérence avec le simulateur Kart
 
 
 # TODOs
 
-Finir validation des vitesses et temps au tour en fermé et ouvert
+Finir validation des vitesses et temps au tour en fermé et ouvert:
+Une discontinuité  vitesse sur traj_sougy à corriger
 
 
 mettre des traj_data dans les fichiers des circuit, ca permet de jouer avec le centre piste

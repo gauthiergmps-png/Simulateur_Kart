@@ -36,13 +36,13 @@ V1.2.3: Je supprime le curseur volant qui sert pas, que je remplace par position
 Hèlas toujours commencer par demander d'appliquer les cursorrules...
 
 Faire marcher un replay par defaut de 5 secondes.
+afficher un temps au tour
 
 Methode controle LG
    Lire le fichier avec Paraview, ou utiliser la fonction MAP... A travailler.
 
 rebaptiser kart_control en kart_pilotage
 Methode "proportionnel":
-Pour passer l'épingle de duffort, il me faut peut être plus de points fins.
 et optimiser les paramètres du gains par des runs AI
 
 Agent q_learning:

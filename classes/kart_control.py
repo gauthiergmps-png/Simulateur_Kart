@@ -63,17 +63,20 @@ class Kart_control:
             v_max = np.sqrt(9.81 / abs(curv_N))
         if v_traj > 1 * v_max:
             frein = 3
+            volant_bonus=3.*np.sign(curv_N)
         elif v_traj > 0.9 * v_max:
             frein = 2
+            volant_bonus=2.*np.sign(curv_N)
         else:
             frein = 0
+            volant_bonus=0.
 
         # controle volant: on vise une vitesse latérale de rapprochement de gain*P3 m/s de signe opposé à l'écat_lat
         gain=min(abs(ecart_lat),self.p2)/self.p2
         v_cible= - np.sign(ecart_lat)*self.p3*gain
         ecart_vlat=v_lat-v_cible
 
-        volant =  - self.p1 * ecart_vlat  * gain
+        volant =  - self.p1 * ecart_vlat  * gain + volant_bonus
 
         # logique gauthier: on vise une vitesse latérale de rapprochement de gain*P3 m/s de signe opposé à l'écat_lat
 

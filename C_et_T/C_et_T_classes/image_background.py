@@ -67,12 +67,16 @@ class ImageBackgroundManager:
                 width_m = (lon_se - lon_nw) * 111320 * lat_factor
                 height_m = (lat_nw - lat_se) * 111320  # Latitude décroît vers le sud
                 
-                # Calculer les coordonnées du coin nord-ouest en mètres
+                # Calculer les coordonnées du coin nord-ouest en mètres (repère géo classique : +Y = nord)
                 x_nw = (lon_nw - lon_center) * 111320 * lat_factor
                 y_nw = (lat_nw - lat_center) * 111320
-                
-                # Définir l'étendue de l'image en mètres
-                self.image_extent = [x_nw, x_nw + width_m, y_nw - height_m, y_nw]
+
+                # Repère d'affichage = même convention que le graphe : nord en haut, +Y données vers le sud
+                # (voir main_C_et_T._apply_plot_limits). On repasse donc en y_aff = -y_geo.
+                y_south = -(y_nw - height_m)
+                y_north = -y_nw
+                # imshow extent : (left, right, bottom, top) en coords données ; bas carte = sud, haut = nord
+                self.image_extent = [x_nw, x_nw + width_m, y_south, y_north]
                 
                 self.image_loaded = True
                 self.info_label.config(text=f"Image modèle chargée: {os.path.basename(filename)}\n"
