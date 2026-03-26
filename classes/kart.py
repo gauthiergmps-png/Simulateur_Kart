@@ -8,8 +8,9 @@ except ImportError:
 
 
 class Mobile():
-    """Classe parente de la classe Kart, représentant un mobile avec ses propriétés physiques,
-    statiques et dynamiques. Le repère mobile est un repère de véhicule (angles de Bryant)."""
+    """Classe parente de la classe Kart, représentant un mobile avec ses seules propriétés physiques,
+    (masse et inertie lacet), statiques (position) et dynamiques. 
+    Le repère mobile est un repère de véhicule (angles de Bryant)."""
 
     # les methodes "update_" ont vocation à être appelées par la simulation
 
@@ -85,7 +86,7 @@ class Kart(Mobile):
 
     Les methodes suivantes ont vocation à être appelées par la simulation:
     - init_state()
-    - init_parametres(h_cdg, ouverture, transm)  si on veut changer des paramètres sans reset
+    - init_parametres(h_cdg, ouverture, transm, pos_cdg optionnel)  si on veut changer des paramètres sans reset
     - update_state(dt, volant, gaz, frein) pour propager l'état du kart à partir des contrôles
 
     Et pour un affichage:    
@@ -155,16 +156,21 @@ class Kart(Mobile):
             vitangul = np.array([0., 0., 0.])
         super().init_state(position=position, vitesse=vitesse, angles=angles, vitangul=vitangul)
 
-    def init_parametres(self, h_cdg=0., ouverture=0, transm=0):
+    def init_parametres(self, h_cdg=0., ouverture=0, transm=0, pos_cdg=None):
         """ initialise ou met à jour les paramètres réglables du kart
             indépendant du reset, car on peut ainsi modifier les paramètres sans reset pendant une simulation 
             en mode interactif
         """
-        self.h_cdg = h_cdg
-        self.transm=transm        # Transmission: 0: roues independantes propulsion, 1: pont arrière rigide, 2: 4 Wheels intégral
         self.h_cdg=h_cdg               # hauteur du cdg par rapport au sol en % de l'empattement
+        self.transm=transm        # Transmission: 0: roues independantes propulsion, 1: pont arrière rigide, 2: 4 Wheels intégral
         self.ouverture = ouverture   # réglage d'ouverture
         self.coul_chassis = 4        # couleur du chassis (4 = normal)
+        if pos_cdg is not None:
+            self.pos_cdg=max(0.0, min(1.0, float(pos_cdg)))
+            self.axar=self.empattement*self.pos_cdg  ;   self.axav=self.empattement*(1-self.pos_cdg)  # valeur absolue des absisses des axes roues av / ar
+            self.inertie_lacet = self.masse/2*self.empattement**2*((1-self.pos_cdg)**2+self.pos_cdg**2)  # inertie en Lacet, Kgm²
+            self.pavg= self.masse*9.81*self.axar/self.empattement/2 ; self.pavd=self.pavg    # calcul des poids statiques du véhicule sur chaque roue 
+            self.parg= self.masse*9.81*self.axav/self.empattement/2 ; self.pard=self.parg  
 
     @property   
     def profil_absolu(self):    

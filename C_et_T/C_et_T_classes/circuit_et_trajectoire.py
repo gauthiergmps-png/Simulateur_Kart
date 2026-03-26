@@ -46,8 +46,8 @@ class Circuit(Profil):
     Classe Circuit héritant de Profil, y ajoute la gestion de la largeur et des bordures
     """
     
-    def __init__(self, name="Circuit", is_closed=True, width=10.0, n_fine_points=100):
-        super().__init__(name, is_closed, n_fine_points)
+    def __init__(self, name="Circuit", is_closed=True, width=10.0):
+        super().__init__(name, is_closed)
         self.width = width
         self.left_border = []
         self.right_border = []
@@ -146,6 +146,10 @@ class Circuit(Profil):
 
         if circuit_data is not None:
             self.width = circuit_data.get('width', self.width)
+
+        if self.is_ready_for_calculation() and len(self.fine_points) >= 3:
+            self.calculate_parameters()
+        elif circuit_data is not None:
             self.left_border = circuit_data.get('left_border', [])
             self.right_border = circuit_data.get('right_border', [])
 
@@ -231,8 +235,8 @@ class Trajectoire(Profil):
     Classe Trajectoire héritant de Profil, ajoute la gestion des vitesses et du temps au tour
     """
     
-    def __init__(self, name="Trajectoire", is_closed=True, max_acceleration=9.81, max_velocity=150/3.6, n_fine_points=100):
-        super().__init__(name, is_closed, n_fine_points)
+    def __init__(self, name="Trajectoire", is_closed=True, max_acceleration=9.81, max_velocity=150/3.6):
+        super().__init__(name, is_closed)
         self.max_acceleration = max_acceleration  # m/s²  soit 1g donc adhérence pneus = 1
         self.max_velocity = max_velocity          # m/s 41.6 m/s, soit 150Km/h
         self.velocities = []                     # Vitesses en chaque point
@@ -328,14 +332,17 @@ class Trajectoire(Profil):
         profil_data = data['profil']
         traj_data = data['traj_data']
 
-        # Recharge la partie Profil
+        # Recharge la partie Profil grossier, qui recalculera le profil fin et ses paramètres
         super().from_dict(profil_data)
 
         # Recharge les champs spécifiques Trajectoire
         self.max_acceleration = traj_data.get('max_acceleration', self.max_acceleration)
         self.max_velocity = traj_data.get('max_velocity', self.max_velocity)
-        self.velocities = traj_data.get('velocities', [])
-        self.lap_time = traj_data.get('lap_time', 0.0)
+        if self.is_ready_for_calculation() and len(self.fine_points) >= 3:
+            self.calculate_parameters()
+        else:
+            self.velocities = traj_data.get('velocities', [])
+            self.lap_time = traj_data.get('lap_time', 0.0)
 
     def _save_trajectory_csv(self, filename):
         """Sauvegarde CSV (actuellement non implémentée)."""

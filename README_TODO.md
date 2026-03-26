@@ -30,14 +30,12 @@ V1.2.1: Trajectoire cible visualisée dans SimulUI à partir d'un circuit ou d'u
 V.1.2.2: J'ai ajouté un mode "Explore" qui permet de tabuler le comportement du Kart dans un espace d'états
          et d'enregister un fichier visualisable dans ParaView: points = (cap, volant, gaz) et T=vitesse
          et l'ameliore l'observabilité de l'état du kart en pause, que je peux forcer en vitesse pendant la pause
-
+V1.2.3: Je supprime le curseur volant qui sert pas, que je remplace par position CdG.
        
 # TODO
 Hèlas toujours commencer par demander d'appliquer les cursorrules...
 
 Faire marcher un replay par defaut de 5 secondes.
-Mettre un indicateur de volant, le scale sert à rien
-remplacer le scale volant par une position cdg
 
 Methode controle LG
    Lire le fichier avec Paraview, ou utiliser la fonction MAP... A travailler.

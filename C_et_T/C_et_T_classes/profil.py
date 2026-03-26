@@ -11,18 +11,17 @@ class Profil:
         - et sur lequel on calcule des paramètres comme distance ou courbures
     """
     
-    def __init__(self, name="Profil", is_closed=True, n_fine_points=100):
+    def __init__(self, name="Profil", is_closed=True):
         """ 
         Initialise un profil
         
         Args:
             name (str): Nom du profil
             is_closed (bool): Si le profil est fermé (circuit) ou ouvert (trajectoire)
-            n_fine_points (int): Nombre de points pour le profil fin
         """
         self.name = name
         self.is_closed = is_closed
-        self.n_fine_points = n_fine_points
+        self.n_fine_points = 100 # valeur par défaut, mais sera recalculée dans calculate_fine_profile
 
         self.input_mode = False   # Mode saisie actif ou non
 
@@ -127,7 +126,14 @@ class Profil:
                            f"Minimum requis: {4 if self.is_closed else 2}")
             
         points = np.array(self.raw_points)
-        
+
+        # calcul de la distance du profil grossier, pour avoir typiquement un point fin par metre
+        length = 0.0
+        for i in range(len(points) - 1):
+            length += np.linalg.norm(points[i+1] - points[i])
+        # borne min.: éviter np.linspace vide ou trop peu d'échantillons pour les splines
+        self.n_fine_points = max(8, int(1.1*length))
+
         try:
             if self.is_closed and len(points) >= 4:
                 # Profil fermé - ajouter le premier point à la fin pour assurer la continuité
@@ -306,26 +312,15 @@ class Profil:
         return data
         
     def from_dict(self, data):
-        """Charge le profil depuis un dictionnaire (format issu de to_dict / to_json)."""
+        """Charge le profil depuis un dictionnaire (format issu de to_dict / to_json).
+
+        Quand on recharge, seul le profil grossier est récupéré,
+        le profil fin et ses paramètres sont recalculés.
+        """
         self.name = data.get('name', self.name)
         self.is_closed = data.get('is_closed', self.is_closed)
-        self.n_fine_points = data.get('n_fine_points', self.n_fine_points)
         self.raw_points = data.get('raw_points', [])
 
-        # Charger éventuellement le profil fin et ses paramètres (si fournis)
-        fine_points = data.get('fine_points', [])
-        if fine_points:
-            self.fine_points = np.array(fine_points, dtype=float)
-        else:
-            self.fine_points = np.array([])
-
-        parameters = data.get('parameters', {}) or {}
-        self.tangents = parameters.get('tangents', [])
-        self.normals = parameters.get('normals', [])
-        self.curvatures = parameters.get('curvatures', [])
-        self.distances = parameters.get('distances', [])
-        self.length = parameters.get('length', 0.0)
-
-        # Fallback : recalculer le profil fin si nécessaire (ancien format / dict incomplet)
-        if (not fine_points) and len(self.raw_points) > 0:
+        if self.is_ready_for_calculation():
             self.calculate_fine_profile()
+            self.calculate_parameters()

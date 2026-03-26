@@ -28,7 +28,6 @@ class User_Interface:
         self.telemesure3 = None
         
         # Variables de contrôle
-        self.volant_curseur = None
         self.pas_de_temps = None
         self.echelle_dyn = None
         self.H_cdg = None
@@ -74,7 +73,7 @@ class User_Interface:
     def _create_main_window(self):
         """Crée la fenêtre principale"""
         self.fenetre = Tk()
-        self.fenetre.title("Simulateur Sprint Car by Laurent Gauthier - V0.13")
+        self.fenetre.title("Simulateur Sprint Car by Laurent Gauthier - V1.2")
         self.fenetre.protocol("WM_DELETE_WINDOW", self._quit_application)
 
     def _quit_application(self):
@@ -132,7 +131,7 @@ class User_Interface:
         self._create_circuits_frame(frames['frame3'])
         
         # Frame 4 - Volant et hauteur CdG
-        self._create_steering_frame(frames['frame4'])
+        self._create_balancing_frame(frames['frame4'])
 
         # Frame 5 - Régulateur et asservissement
         self._create_regulator_frame(frames['frame5'])
@@ -245,15 +244,15 @@ class User_Interface:
                            command=self._handle_load_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
         self.circuit.set(0)
      
-    def _create_steering_frame(self, frame):
-        """Crée le frame de contrôle du volant et hauteur CdG, 
+    def _create_balancing_frame(self, frame):
+        """Crée le frame de contrôle de position et hauteur CdG, 
          """
  
-        self.volant_curseur = Scale(frame, from_=-45, to=45, length=150, label="Volant", orient=HORIZONTAL)
-        self.volant_curseur.set(0)
-        self.volant_curseur.pack()
+        self.pos_cdg = Scale(frame, from_=20, to=80, resolution=1, length=150, label="pos CdG %% (0 AR 100 AV)", orient=HORIZONTAL)
+        self.pos_cdg.set(40)
+        self.pos_cdg.pack()
         
-        self.H_cdg = Scale(frame, from_=0, to=100, length=150, label="H CdG en %", orient=HORIZONTAL)
+        self.H_cdg = Scale(frame, from_=0, to=50, length=150, label="H CdG en %", orient=HORIZONTAL)
         self.H_cdg.set(0)
         self.H_cdg.pack()
 

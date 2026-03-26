@@ -73,7 +73,7 @@ class SimulationCore:
            Arguments:
                   kart_controls : dict commandes pilote (volant, gaz, frein).
                   simu_controls (optionnel): dict régulateur / asservissement (regul, vold).
-                  kart_parametres (optionnel): dict réglages kart (h_cdg, ouverture, transm).
+                  kart_parametres (optionnel): dict réglages kart (h_cdg, ouverture, transm, pos_cdg optionnel).
 
             Return: un dict avec : pas_simul, temps, V, gaz, volant.
 
@@ -90,7 +90,8 @@ class SimulationCore:
             h_cdg = kart_parametres['h_cdg']
             ouverture = kart_parametres['ouverture']
             transm = kart_parametres['transm']
-            self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm)
+            pos_cdg = kart_parametres.get('pos_cdg')
+            self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm, pos_cdg=pos_cdg)
 
 
         volant = kart_controls['volant']
@@ -235,7 +236,6 @@ class SimulationUI(User_Interface):
         
         # Variables de commande du kart qui seront issues des interactions utilisateur
         self.volant = 0.
-        self.volant_curseur.set(0)  # et volant droit
         self.gaz = 0.
         self.frein = 0
 
@@ -261,16 +261,12 @@ class SimulationUI(User_Interface):
         # Volant = Gauche/Droite variations +/- 5°, saturé à 45° - réglage fin = l,m
         if event.keysym == "Left":
             self.volant = max(self.volant - 5., -45.)
-            self.volant_curseur.set(self.volant)
         if event.keysym == "Right":
             self.volant = min(self.volant + 5., 45.)
-            self.volant_curseur.set(self.volant)
         if event.keysym == "l":
             self.volant = max(self.volant - 1., -45.)
-            self.volant_curseur.set(self.volant)
         if event.keysym == "m":
             self.volant = min(self.volant + 1., 45.)
-            self.volant_curseur.set(self.volant)
         
         # s/x = gaz up/down - reglage fin avec majuscule
         if event.keysym == "s":
@@ -551,11 +547,10 @@ class SimulationUI(User_Interface):
         # Affichage info dynamiques des roues
         self._trace_dyn_roues(kc, origx, origy, lacet)
         
-        # affichage indicateurs gaz/frein
+        # affichage indicateurs gaz/frein, compte tour et vitesse, volant
         self._trace_indicators_gaz_frein()
-        
-        # affichage compte tour et vitesse
         self._trace_compteur_vitesse()
+        self._trace_volant()
     
     def _trace_dyn_roues(self, kc, origx, origy, lacet):
         """Trace les informations dynamiques des roues"""
@@ -593,9 +588,19 @@ class SimulationUI(User_Interface):
     def _trace_compteur_vitesse(self):
         """Trace le compteur de vitesse"""
         V = 3.6 * norme_vecteur(self.kart.vitesse)
-        self.cnv.create_arc((100, 40), (190, 130), outline="cyan", extent=max(-240, -2 * V), start=210,
-                           fill='', width=20, style="arc")
-        self.cnv.create_text(143, 80, text=str(int(V)), font="Arial 18", fill="white")
+        self.cnv.create_arc((200, 50), (270, 120), outline="cyan", extent=max(-240, -2 * V), start=210,
+                           fill='', width=15, style="arc")
+        self.cnv.create_text(233, 80, text=str(int(V)), font="Arial 18", fill="white")
+
+    
+    def _trace_volant(self):
+        """Dessine le volant"""
+        self.cnv.create_arc((100, 40), (170, 110), outline="grey", extent=359.9, start=0,
+                           fill='', width=12, style="arc")
+        self.cnv.create_arc((100, 40), (170, 110), outline="red", extent=12, 
+                           start=int(85-2*self.volant),
+                           fill='', width=12, style="arc")
+        self.cnv.create_text(133, 75, text=str(int(self.volant)), font="Arial 18", fill="white")
 
     def _handle_record(self):
         """Change le status de self.record_status et du bouton RECORD
@@ -628,7 +633,7 @@ class SimulationUI(User_Interface):
                 data = json.load(f)
                 # Format JSON: contient les conditions initiales et les commandes sous la forme:
                 # {"conditions_t0": {position, vitesse, angles, vitangul?, ...},
-                #  "parametres": {h_cdg, ouverture, transm},
+                #  "parametres": {h_cdg, ouverture, transm, pos_cdg?},
                 #  "steps": [...]}
                 # où un step est un dictionnaire: {"volant": x, "gaz": y, "frein": z}
                 self.controls_recorded = data["steps"]
@@ -639,7 +644,8 @@ class SimulationUI(User_Interface):
                     h_cdg = parametres.get("h_cdg", self.kart.h_cdg)
                     ouverture = parametres.get("ouverture", self.kart.ouverture)
                     transm = parametres.get("transm", self.kart.transm)
-                    self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm)
+                    pos_cdg = parametres.get("pos_cdg")
+                    self.kart.init_parametres(h_cdg=h_cdg, ouverture=ouverture, transm=transm, pos_cdg=pos_cdg)
             print(f"Commandes lues depuis '{path_cmd}'.")
             # Des commandes sont disponibles : on autorise le bouton REPLAY
             self.btn_replay.config(state="normal")
@@ -755,6 +761,7 @@ class SimulationUI(User_Interface):
             'h_cdg': self.kart.empattement / 100. * self.H_cdg.get(),
             'ouverture': self.ouverture.get(),
             'transm': self.transm.get(),
+            'pos_cdg': self.pos_cdg.get() / 100.,
         }
         self._explore_simu_controls = dict(simu_controls)
         self._explore_kart_parametres = dict(kart_parametres)
@@ -783,7 +790,7 @@ class SimulationUI(User_Interface):
 
             vitesse = np.array([vit * np.cos(cap_rad), vit * np.sin(cap_rad), 0.])
             self.kart.init_state(vitesse=vitesse)
-            # self.volant_curseur.set(vol)
+
             if gaz >= 0:
                 self.gaz = gaz
                 self.frein = 0
@@ -1006,6 +1013,7 @@ class SimulationUI(User_Interface):
                 "h_cdg": float(kp.get("h_cdg", 0.)),
                 "ouverture": int(kp.get("ouverture", 0)),
                 "transm": int(kp.get("transm", 0)),
+                "pos_cdg": float(kp.get("pos_cdg", 0.)),
             },
             "explore_values": self.explore_values,
         }
@@ -1016,7 +1024,6 @@ class SimulationUI(User_Interface):
     def show_controls(self, kart_controls):
         """Affiche les commandes du kart définies par un mode non manuel dans l'UI"""
         self.volant = kart_controls['volant']
-        self.volant_curseur.set(kart_controls['volant'])
         self.gaz = kart_controls['gaz']
         self.frein = kart_controls['frein']
 
@@ -1040,8 +1047,9 @@ class SimulationUI(User_Interface):
         # Paramètres du kart (hauteur CdG, ouverture arrière, mode transmission) — lus sur l'UI
         kart_parametres = { 'h_cdg': self.kart.empattement / 100. * self.H_cdg.get(),
                         'ouverture': self.ouverture.get(),
-                           'transm': self.transm.get(), }
-
+                           'transm': self.transm.get(),
+                           'pos_cdg': self.pos_cdg.get() / 100., }
+ 
         # Écarts trajectoire (tuple attendu par Kart_control ; pas de trajectoire → zéros)
         if self.core.traj_cible is not None and len(self.core.traj_cible.fine_points) > 0:
             observations = self.core.get_observations()
@@ -1064,7 +1072,7 @@ class SimulationUI(User_Interface):
 
             # Mode de contrôle demandé par l'utilisateur: Manuel ou agent de pilotage ?
             mode = int(self.commandes.get())
-            manual_commands = {'volant': float(self.volant_curseur.get()),'gaz': self.gaz,'frein': self.frein}
+            manual_commands = {'volant': float(self.volant),'gaz': self.gaz,'frein': self.frein}
 
             if mode == Kart_control.MODE_MANUEL:
                 # mode manuel: on applique directement les commandes demandées par l'utilisateur
