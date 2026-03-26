@@ -11,17 +11,17 @@ V1.2 - Mars 2026: Importation dans le projet Kart Simulator, donc n° Version gl
 
 Je supprime la classe File_manager pour avoir les méthodes load et save directement dans les classes Circuit et Trajectoire
 
+V.1.2.3: Le nombre de fine_point est défini par la longueur du raw_circuit et on a au moins 1 pt/m
+
+
 # TODOs
 
-Le nombre de fine_point pourra être déterminé pour être défini par la longueur du raw_circuit et avoir 1 pt/m
+Finir validation des vitesses et temps au tour en fermé et ouvert
 
-et mettre des traj_data dans les fichiers des circuit, ca permet de jouer avec le centre piste
 
-A la lecture, il faut regénérer les data qu'on peut plutot que de relire le fichier
+mettre des traj_data dans les fichiers des circuit, ca permet de jouer avec le centre piste
 
 suppression du 5ème PDP: j'ai un crash d'index sur le plus proche dès fois, à comprendre
-
-Finir validation des vitesses et temps au tour en fermé et ouvert
 
 
 

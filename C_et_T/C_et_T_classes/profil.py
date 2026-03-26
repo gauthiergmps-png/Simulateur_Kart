@@ -89,15 +89,36 @@ class Profil:
         closest_index = None
         if len(self.raw_points) == 0:
             return closest_index
-            
-        min_distance = float('inf')
+
+        def dist_l1(px, py):
+            return abs(x - px) + abs(y - py)
+
+        last_i = len(self.raw_points) - 1
+        d_last = dist_l1(self.raw_points[last_i][0], self.raw_points[last_i][1])
+
+        if d_last >= threshold:
+            min_distance = float('inf')
+            for i, point in enumerate(self.raw_points):
+                # on utilise la distance issue de la norme 1, c'est plus rapide que la norme 2
+                distance = dist_l1(point[0], point[1])
+                if distance < min_distance and distance < threshold:
+                    min_distance = distance
+                    closest_index = i
+            return closest_index
+
+        # Dernier point saisi privilégié : un autre n'est retenu que s'il est à moins de la moitié
+        # de la distance L1 souris–dernier point (et sous le seuil).
+        cutoff = 0.5 * d_last
+        best_i = last_i
+        best_d = d_last
         for i, point in enumerate(self.raw_points):
-            # on utilise la distance issue de la norme 1, c'est plus rapide que la norme 2
-            distance = abs(x - point[0]) + abs(y - point[1])
-            if distance < min_distance and distance < threshold:
-                min_distance = distance
-                closest_index = i
-        return closest_index
+            if i == last_i:
+                continue
+            distance = dist_l1(point[0], point[1])
+            if distance < threshold and distance < cutoff and distance < best_d:
+                best_d = distance
+                best_i = i
+        return best_i
 
     def closest_fine_point(self, x, y, threshold=10):
         """Trouve l'index du point fin le plus proche des coordonnées (x, y)"""

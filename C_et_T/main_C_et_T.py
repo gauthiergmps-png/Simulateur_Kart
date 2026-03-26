@@ -7,6 +7,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from scipy.interpolate import splprep, splev
@@ -70,6 +71,7 @@ class CircuitSimulator:
 
         # Initialiser le gestionnaire d'image après la création de self.ax
         self.image_manager = ImageBackgroundManager(self.root, self.ax, self.info_label)
+        self.root.after_idle(self._startup_canvas_and_plot)
 
     def _reset_model_background_image(self):
         """Efface l'image modèle (nouveau circuit ou chargement d'un autre fichier). Hors saisie, l'image reste en mémoire pour réaffichage."""
@@ -84,13 +86,15 @@ class CircuitSimulator:
             success = self.image_manager.load_background_image()
             if success and self.image_manager.image_extent is not None:
                 ext = self.image_manager.image_extent
-                # Vue carrée englobant l'image (même échelle X/Y, cohérent avec zoom / aspect 1:1)
                 x0, x1, y0, y1 = ext[0], ext[1], ext[2], ext[3]
                 cx = (x0 + x1) / 2
                 cy = (y0 + y1) / 2
-                half = max(abs(x1 - x0), abs(y1 - y0)) / 2
-                self.current_xlim = (cx - half, cx + half)
-                self.current_ylim = (cy - half, cy + half)
+                need_x = abs(x1 - x0)
+                need_y = abs(y1 - y0)
+                ar = self._plot_axis_aspect_ratio()
+                x_span, y_span = self._xy_spans_for_data_aspect(need_x, need_y, ar)
+                self.current_xlim = (cx - x_span / 2, cx + x_span / 2)
+                self.current_ylim = (cy - y_span / 2, cy + y_span / 2)
             if success:
                 self.update_plot(False)
         
@@ -165,24 +169,30 @@ class CircuitSimulator:
         plot_frame = ttk.Frame(main_frame)
         plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-        # Canvas matplotlib
-        self.fig, self.ax = plt.subplots(figsize=(12, 9))
-        # Après plt.subplots(), ajustez les marges :
-        self.fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+        # Taille par défaut lisible avant le 1er Configure ; puis ajustée à la zone Tk.
+        self.fig, self.ax = plt.subplots(figsize=(8, 6), dpi=100)
+        self.fig.subplots_adjust(left=0.06, right=0.99, top=0.96, bottom=0.06)
         self.canvas = FigureCanvasTkAgg(self.fig, plot_frame)
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        plot_tk = self.canvas.get_tk_widget()
+        plot_tk.pack(fill=tk.BOTH, expand=True)
+        # Ne pas binder <Configure> ici : le backend Matplotlib le fait déjà sur ce widget ;
+        # un second bind remplacerait son resize() et casserait la taille du PhotoImage (graphique tronqué).
         
         # Bind des événements
         self.canvas.mpl_connect('button_press_event', self.on_press)
         self.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas.mpl_connect('motion_notify_event', self.on_motion)
         self.canvas.mpl_connect('scroll_event', self.on_scroll)
-        self.canvas.get_tk_widget().bind('<KeyPress>', self.on_key_press)
-        self.canvas.get_tk_widget().focus_set()
+        plot_tk.bind('<KeyPress>', self.on_key_press)
+        plot_tk.focus_set()
+        
+    def _startup_canvas_and_plot(self):
+        """Premier tracé (setup_plot ne dessine pas encore sur le canvas). La taille suit le widget via le backend Mpl."""
+        self.setup_view()
+        self.update_plot(False)
         
     def setup_plot(self):
         """Configure le graphique matplotlib"""
-        self.ax.set_aspect("equal")
         self.ax.grid(True, alpha=0.3)
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
@@ -191,15 +201,35 @@ class CircuitSimulator:
         # Limites par défaut
         self.setup_view()
 
-    def setup_view(self):
-        view_width = self.view_width
-        half = view_width / 2
-        # Même étendue en X et Y : échelle 1:1 (1 m horizontal = 1 m vertical à l'écran).
-        self.current_xlim = (-half, half)
-        self.current_ylim = (-half, half)
+    def _apply_plot_limits(self):
+        """Applique xlim/ylim ; +Y écran vers le bas ; même échelle données X/Y (carré = carré)."""
         self.ax.set_xlim(self.current_xlim)
-        self.ax.set_ylim(self.current_ylim)
-        self.ax.set_aspect("equal")
+        self.ax.set_ylim(self.current_ylim[1], self.current_ylim[0])
+        # Échelle identique en m/m sur X et Y (pas équivalence des plages, mais même pas pixel / unité).
+        self.ax.set_aspect("equal", adjustable="box")
+
+    def _plot_axis_aspect_ratio(self):
+        """Rapport largeur / hauteur de la figure (zone graphe ~ rectangle de la fenêtre)."""
+        fw, fh = self.fig.get_figwidth(), self.fig.get_figheight()
+        if fw <= 1e-6 or fh <= 1e-6:
+            return 4.0 / 3.0
+        return fw / fh
+
+    @staticmethod
+    def _xy_spans_for_data_aspect(need_x, need_y, ar):
+        """En m : plages X et Y contenant need_x, need_y avec need_x<=x_span, need_y<=y_span et x_span/y_span=ar."""
+        x_span = max(float(need_x), float(need_y) * ar)
+        y_span = x_span / ar
+        return x_span, y_span
+
+    def setup_view(self):
+        # view_width = étendue horizontale souhaitée (m) ; verticale dérivée pour remplir le rectangle figure (même échelle X/Y).
+        ar = self._plot_axis_aspect_ratio()
+        x_half = self.view_width / 2
+        y_half = x_half / ar
+        self.current_xlim = (-x_half, x_half)
+        self.current_ylim = (-y_half, y_half)
+        self._apply_plot_limits()
 
         
     def on_scroll(self, event):
@@ -221,16 +251,14 @@ class CircuitSimulator:
         y_span = self.current_ylim[1] - self.current_ylim[0]
         if x_span <= 0 or y_span <= 0:
             return
-        span = max(x_span, y_span) * scale_factor
-
-        relx = (self.current_xlim[1] - xdata) / x_span
-        rely = (self.current_ylim[1] - ydata) / y_span
-
-        self.current_xlim = [xdata - span * (1 - relx), xdata + span * relx]
-        self.current_ylim = [ydata - span * (1 - rely), ydata + span * rely]
-        self.ax.set_xlim(self.current_xlim)
-        self.ax.set_ylim(self.current_ylim)
-        self.ax.set_aspect("equal")
+        ar = self._plot_axis_aspect_ratio()
+        x_span_new = x_span * scale_factor
+        y_span_new = x_span_new / ar
+        fx = (xdata - self.current_xlim[0]) / x_span
+        fy = (ydata - self.current_ylim[0]) / y_span
+        self.current_xlim = (xdata - fx * x_span_new, xdata - fx * x_span_new + x_span_new)
+        self.current_ylim = (ydata - fy * y_span_new, ydata - fy * y_span_new + y_span_new)
+        self._apply_plot_limits()
         
         self.canvas.draw()
         
@@ -275,6 +303,7 @@ class CircuitSimulator:
         if event.button == 1:  # Clic gauche
             if self.circuit.input_mode:  # Si on est en mode saisie circuit
                 if self.clicked_raw is not None:    # si on clique sur un point grossier existant du circuit, on peut le deplacer
+                    self.closest_fine = None
                     self.dragging_point = True
                     self.dragged_point_index = self.clicked_raw
                 elif self.closest_raw is not None or len(self.circuit.raw_points)==0:
@@ -284,6 +313,7 @@ class CircuitSimulator:
             elif self.trajectory.input_mode:  # Si on est en mode saisie trajectoire
                 # Mode normal - vérifier si on clique sur un PDP
                 if self.clicked_raw is not None:       # si on clique sur un PDP de la trajectoire, on peut le deplacer
+                    self.closest_fine = None
                     self.dragging_point = True
                     self.dragged_point_index = self.clicked_raw
                 else:                         # si on clique sur un point quelconque = ajout de point PDP
@@ -293,11 +323,13 @@ class CircuitSimulator:
                 if self.closest_fine is not None:   # si on clique sur un point de trajectoire fine, on affiche ses infos
                     self.update_trajectory_info(self.closest_fine)
                 else:                      # si on clique sur un point quelconque = deplacement de la vue
+                    self.closest_fine = None
                     self.dragging_view = True
                     self.drag_start = (x,y)
                     self.drag_xlim = self.current_xlim
                     self.drag_ylim = self.current_ylim
         elif event.button == 2:  # Clic milieu - déplacement de vue
+            self.closest_fine = None
             self.dragging_view = True
             self.drag_start = (x,y)
             self.drag_xlim = self.current_xlim
@@ -313,6 +345,9 @@ class CircuitSimulator:
     def on_motion(self, event):
         """Gère le mouvement de la souris"""
         if event.inaxes != self.ax:
+            if self.closest_fine is not None:
+                self.closest_fine = None
+                self.update_plot(True)
             return
         x, y = event.xdata, event.ydata
         if self.dragging_point and self.dragged_point_index is not None:
@@ -333,24 +368,27 @@ class CircuitSimulator:
             dy = y - self.drag_start[1]
             self.current_xlim = (self.drag_xlim[0] - dx, self.drag_xlim[1] - dx)
             self.current_ylim = (self.drag_ylim[0] - dy, self.drag_ylim[1] - dy)
-            self.ax.set_xlim(self.current_xlim)
-            self.ax.set_ylim(self.current_ylim)
-            self.ax.set_aspect("equal")
+            self._apply_plot_limits()
             #self.update_plot(True)   
             self.canvas.draw_idle()  
         elif self.circuit.input_mode:
+            self.closest_fine = None
             # Mettre à jour la couleur du point de saisie le plus proche
             self.closest_raw = self.circuit.closest_raw_point(x, y, threshold=1000)
             self.update_plot(True)  
         elif self.trajectory.input_mode:
+            self.closest_fine = None
             # Mettre à jour la couleur du point de saisie le plus proche
             self.closest_raw = self.trajectory.closest_raw_point(x, y, threshold=1000)
             self.update_plot(True)   
         elif not(self.dragging_point) and not(self.dragging_view) and \
              x is not None and y is not None and not self.circuit.input_mode and len(self.trajectory.fine_points) > 0:
-            traj_idx = self.trajectory.closest_fine_point(x, y , threshold=10)
-            if traj_idx is not None:   # si on passe sur un point de trajectoire fine, on affiche ses infos
-                self.update_trajectory_info(traj_idx)
+            prev_fine = self.closest_fine
+            self.update_closest_points(event)
+            if self.closest_fine != prev_fine:
+                self.update_plot(True)
+            if self.closest_fine is not None:
+                self.update_trajectory_info(self.closest_fine)
         else:
             Warning("Erreur inattendue dans on_motion")
 
@@ -415,8 +453,21 @@ class CircuitSimulator:
             info += f"\nErreur: {e}"
         self.info_label.config(text=info)
         
+    def _trajectory_has_memory_data(self):
+        """True si la trajectoire courante contient des points bruts ou un profil fin (données à perdre)."""
+        t = self.trajectory
+        return len(t.raw_points) > 0 or len(t.fine_points) > 0
+
     def new_trajectory(self):
         """Crée une nouvelle trajectoire"""
+        if self._trajectory_has_memory_data():
+            if not messagebox.askyesno(
+                "Nouvelle trajectoire",
+                "Une trajectoire est déjà présente en mémoire (points de passage ou tracé calculé).\n"
+                "Si vous n'avez pas sauvegardé, ces données seront perdues.\n\n"
+                "Créer une nouvelle trajectoire ?",
+            ):
+                return
         self.trajectory = Trajectoire("Trajectoire", is_closed=self.circuit.is_closed)
         self.circuit.stop_input()
         self.trajectory.start_input()
@@ -507,18 +558,17 @@ class CircuitSimulator:
             x_min, x_max = points[:, 0].min(), points[:, 0].max()
             y_min, y_max = points[:, 1].min(), points[:, 1].max()
             
-            # Ajouter une marge ; fenêtre carrée en données pour aspect 1:1
+            # Marge puis plages X/Y avec le même rapport que la figure (échelle m/m identique).
             margin = min(max(x_max - x_min, y_max - y_min) * 0.2, 10)
             cx = (x_min + x_max) / 2
             cy = (y_min + y_max) / 2
-            half_wx = (x_max - x_min) / 2 + margin
-            half_wy = (y_max - y_min) / 2 + margin
-            half = max(half_wx, half_wy)
-            self.current_xlim = (cx - half, cx + half)
-            self.current_ylim = (cy - half, cy + half)
-            self.ax.set_xlim(self.current_xlim)
-            self.ax.set_ylim(self.current_ylim)
-            self.ax.set_aspect("equal")
+            need_x = (x_max - x_min) + 2 * margin
+            need_y = (y_max - y_min) + 2 * margin
+            ar = self._plot_axis_aspect_ratio()
+            x_span, y_span = self._xy_spans_for_data_aspect(need_x, need_y, ar)
+            self.current_xlim = (cx - x_span / 2, cx + x_span / 2)
+            self.current_ylim = (cy - y_span / 2, cy + y_span / 2)
+            self._apply_plot_limits()
 
         self.canvas.draw()
         
@@ -744,19 +794,15 @@ class CircuitSimulator:
         self.update_plot(False)
             
     def update_plot(self, motion=False):
-        """Met à jour le graphique, de manière allégée si motion=True"""
-        static = not motion
-
+        """Met à jour le graphique. motion conservé pour les appelants (ex. calculate_*), sans masquer la trajectoire optimisée."""
         self.update_instructions_and_buttons()
         self.ax.clear()
-        self.ax.set_aspect("equal")
         self.ax.grid(True, alpha=0.3)
         self.ax.set_xlabel('X (m)')
         self.ax.set_ylabel('Y (m)')
         self.ax.set_title('Simulateur de Circuit')
-        self.ax.set_xlim(self.current_xlim)
-        self.ax.set_ylim(self.current_ylim)
-        
+        self._apply_plot_limits()
+
         # Image modèle géoréférencée (mode saisie circuit uniquement)
         self.image_manager.display_background_image(self.circuit.input_mode)
         
@@ -823,10 +869,10 @@ class CircuitSimulator:
                 traj_points_ext = traj_points
             self.ax.plot(traj_points_ext[:, 0], traj_points_ext[:, 1], 'b-', linewidth=1)
             # Affiche les points de trajectoires colorés selon la vitesse, plus quelques vitesses
-            if static and len(self.trajectory.velocities) > 0:
+            if len(self.trajectory.velocities) > 0:
                 # Mapping des types d'accélération vers les couleurs
                 color_map = {
-                    0: 'blue',    # Vitesse constante
+                    0: 'blue',    # Vitesse saturée à Vmax
                     1: 'brown',   # Accélération limitée par adhérence (=patinage)
                     2: 'green',   # Accélération limitée par puissance (=grip)
                     3: 'grey',    # Levée de pied
@@ -835,19 +881,53 @@ class CircuitSimulator:
                 colors = [color_map.get(v) for v in self.trajectory.type_accel]  
                         
                 self.ax.scatter(traj_points[:, 0], traj_points[:, 1], c=colors, s=30, zorder=7)
+
+                legend_handles = [
+                    Line2D([0], [0], marker='o', color='none', linestyle='None',
+                           markerfacecolor=color_map[k], markeredgecolor='black', markeredgewidth=0.2,
+                           markersize=6, label=texte)
+                    for k, texte in (
+                        (0, 'Vitesse saturée à Vmax'),
+                        (1, 'Accélération limitée par adhérence (=patinage)'),
+                        (2, 'Accélération limitée par puissance (=grip)'),
+                        (3, 'Levée de pied'),
+                        (4, 'Freinage'),
+                    )
+                ]
+                self.ax.legend(
+                    handles=legend_handles,
+                    loc='upper right',
+                    fontsize=7,
+                    framealpha=0.9,
+                    title='Phase (optim.)',
+                    title_fontsize=8,
+                )
                 
-                # Afficher quelques vitesses maximales
-                step = max(1, len(traj_points) // 10)
-                for i in range(0, len(traj_points), step):
-                    if i < len(self.trajectory.velocities):
+                # Vitesses aux changements de phase (couleur différente du point précédent)
+                ta = self.trajectory.type_accel
+                n = min(len(traj_points), len(self.trajectory.velocities), len(ta))
+                for i in range(n):
+                    if i == 0 or ta[i] != ta[i - 1]:
                         v_kmh = self.trajectory.velocities[i] * 3.6
                         self.ax.annotate(f'{v_kmh:.0f} km/h', (traj_points[i, 0], traj_points[i, 1]),
                                        xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.8)
+
+                hi = self.closest_fine
+                if hi is not None and hi < len(self.trajectory.velocities) and hi < len(traj_points):
+                    v_kmh = self.trajectory.velocities[hi] * 3.6
+                    self.ax.annotate(
+                        f'{v_kmh:.0f} km/h',
+                        (traj_points[hi, 0], traj_points[hi, 1]),
+                        xytext=(16, 18),
+                        textcoords='offset points',
+                        fontsize=9,
+                        fontweight='bold',
+                        color='darkviolet',
+                        bbox=dict(boxstyle='round,pad=0.35', facecolor='khaki', edgecolor='darkviolet', alpha=0.92),
+                    )
                       
         # Ne jamais changer automatiquement les limites - seulement les restaurer si elles existent
-        self.ax.set_xlim(self.current_xlim)
-        self.ax.set_ylim(self.current_ylim)
-        self.ax.set_aspect("equal")
+        self._apply_plot_limits()
 
         self.canvas.draw()
 
