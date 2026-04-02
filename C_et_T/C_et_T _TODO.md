@@ -21,6 +21,8 @@ Finir validation des vitesses et temps au tour en fermé et ouvert:
 Une discontinuité  vitesse sur traj_sougy à corriger
 
 
+deplacer l'affichage avec les flèches
+
 mettre des traj_data dans les fichiers des circuit, ca permet de jouer avec le centre piste
 
 suppression du 5ème PDP: j'ai un crash d'index sur le plus proche dès fois, à comprendre

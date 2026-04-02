@@ -231,7 +231,6 @@ class CircuitSimulator:
         self.current_xlim = (-x_half, x_half)
         self.current_ylim = (-y_half, y_half)
         self._apply_plot_limits()
-
         
     def on_scroll(self, event):
         """Gère le zoom avec la molette de la souris"""
@@ -290,6 +289,7 @@ class CircuitSimulator:
         elif self.trajectory.input_mode:
             self.closest_raw = self.trajectory.closest_raw_point(x, y, threshold=1000)
             self.clicked_raw = self.trajectory.closest_raw_point(x, y, threshold=1)
+            self.closest_fine = self.trajectory.closest_fine_point(x, y, threshold=10)
         else:
             self.closest_fine = self.trajectory.closest_fine_point(x, y, threshold=10)
         
@@ -373,14 +373,10 @@ class CircuitSimulator:
             #self.update_plot(True)   
             self.canvas.draw_idle()  
         elif self.circuit.input_mode:
-            self.closest_fine = None
-            # Mettre à jour la couleur du point de saisie le plus proche
-            self.closest_raw = self.circuit.closest_raw_point(x, y, threshold=1000)
+            self.update_closest_points(event)
             self.update_plot(True)  
         elif self.trajectory.input_mode:
-            self.closest_fine = None
-            # Mettre à jour la couleur du point de saisie le plus proche
-            self.closest_raw = self.trajectory.closest_raw_point(x, y, threshold=1000)
+            self.update_closest_points(event)
             self.update_plot(True)   
         elif not(self.dragging_point) and not(self.dragging_view) and \
              x is not None and y is not None and not self.circuit.input_mode and len(self.trajectory.fine_points) > 0:
@@ -670,8 +666,8 @@ class CircuitSimulator:
         else:                            # On démarre ou redemarre la saisie de la trajectoire
             self.circuit.stop_input()
             self.trajectory.start_input()
-            # if self.trajectory.is_ready_for_calculation():
-            #     self.calculate_trajectory(motion=False, stop=True)
+            if self.trajectory.is_ready_for_calculation():
+                self.calculate_trajectory(motion=False, stop=False)
             self.info_label.config(text="Mode saisie PDP activé. Cliquez pour ajouter des points de passage")
         self.update_plot()
         
@@ -873,7 +869,7 @@ class CircuitSimulator:
                 traj_points_ext = traj_points
             self.ax.plot(traj_points_ext[:, 0], traj_points_ext[:, 1], 'b-', linewidth=1)
 
-            # Affiche les points de trajectoires colorés selon la vitesse, plus quelques labels vitesses
+
             if len(self.trajectory.velocities) > 0:
                 # Mapping des types d'accélération vers les couleurs
                 color_map = {
@@ -883,10 +879,11 @@ class CircuitSimulator:
                     3: 'grey',    # Levée de pied
                     4: 'red'      # Freinage
                 }
-                colors = [color_map.get(v) for v in self.trajectory.type_accel]  
-                        
+                # Affiche les points de trajectoires colorés selon la vitesse
+                colors = [color_map.get(v) for v in self.trajectory.type_accel]                         
                 self.ax.scatter(traj_points[:, 0], traj_points[:, 1], c=colors, s=30, zorder=7)
 
+                # On affiche une légende des phases (couleurs) en haut à droite
                 legend_handles = [
                     Line2D([0], [0], marker='o', color='none', linestyle='None',
                            markerfacecolor=color_map[k], markeredgecolor='black', markeredgewidth=0.2,
@@ -899,24 +896,21 @@ class CircuitSimulator:
                         (4, 'Freinage'),
                     )
                 ]
-                self.ax.legend(
-                    handles=legend_handles,
-                    loc='upper right',
-                    fontsize=7,
-                    framealpha=0.9,
-                    title='Phase (optim.)',
-                    title_fontsize=8,
-                )
+                self.ax.legend(handles=legend_handles, loc='upper right', fontsize=7,
+                    framealpha=0.9, title='Phase (optim.)',title_fontsize=8 )
                 
-                # Vitesses aux changements de phase (couleur différente du point précédent)
+                # Affichage des vitesses aux changements de phase 
+                # = couleur différente du point précédent, sauf au point bleu
                 ta = self.trajectory.type_accel
                 n = min(len(traj_points), len(self.trajectory.velocities), len(ta))
                 for i in range(n):
-                    if i == 0 or ta[i] != ta[i - 1]:
+                    if i == 0 or (ta[i] != ta[i - 1] and ta[i-1] != 0):
                         v_kmh = self.trajectory.velocities[i] * 3.6
+                        # if not self.trajectory.input_mode:
                         self.ax.annotate(f'{v_kmh:.0f} km/h', (traj_points[i, 0], traj_points[i, 1]),
                                        xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.8)
 
+                # Vitesses du point fin le plus proche de la souris
                 hi = self.closest_fine
                 if hi is not None and hi < len(self.trajectory.velocities) and hi < len(traj_points):
                     v_kmh = self.trajectory.velocities[hi] * 3.6
