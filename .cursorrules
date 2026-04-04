@@ -9,3 +9,4 @@ Ne jamais modifier l’aspect ou le style de mise en forme du code existant si l
 ## Tkinter — messagebox
 Ne se servir de `messagebox` que pour afficher des messages d’erreur (`messagebox.showerror`). 
 Ne pas utiliser `showinfo`, `showwarning`, `askyesno`, `askokcancel`, etc. 
+Ne pas créer de fonction d'une seule ligne de code utile

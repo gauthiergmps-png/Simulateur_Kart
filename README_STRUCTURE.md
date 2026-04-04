@@ -125,9 +125,10 @@ Package Python (fichier vide ou minimal).
 - `_trace_dyn_roues` — Cercles / forces par roue sur le canvas.
 - `_trace_indicators_gaz_frein` — Barres gaz et frein.
 - `_trace_compteur_vitesse` — Cadran vitesse.
-- `_handle_record` — Démarre un enregistrement de commandes (surcharge pour logique pas_simul == 0).
-- `read_commands` — Lit un fichier de commandes dans `Records/` pour le replay.
-- `record_replay` — Active le mode replay à partir des commandes chargées.
+- `recorder_start` — Démarre un enregistrement de commandes (surcharge pour logique pas_simul == 0).
+- `recorder_read` — Dialogue fichier : lit un fichier de commandes pour le replay.
+- `recorder_save` — Dialogue fichier : sauvegarde l’enregistrement mémoire au format commandes.
+- `record_replay` — Active le mode replay à partir des commandes chargées (appelé par `recorder_replay`).
 - `update_telemetry` — Formate et envoie les trois lignes de télémesure (via `show_telemetry_*`).
 - `_explore_combinations_gen` — Générateur des tuples `(cap_rad, vit, vol, gaz)` selon les cases EXPLORE ; remplit `explore_values` pour le JSON.
 - `explore_states` — Démarre l’exploration : copie `simu_controls` / `kart_parametres`, enregistre pour export, lance `_explore_step`.
@@ -159,9 +160,10 @@ Package Python (fichier vide ou minimal).
 - `_setup_key_bindings` — Focus canvas et bindings touches.
 - `press_key` / `stop_key` — Hooks vides, à surcharger dans `SimulationUI`.
 - `_handle_explore` — Passe `explore_status` à vrai pour déclencher l’exploration au prochain `animation_step`.
-- `_handle_reset` / `_handle_pause` / `_handle_record` / `_handle_stop` / `_handle_replay` — Boutons UI (certaines méthodes abstraites ou surchargées dans la classe fille).
+- `_handle_reset` / `_handle_pause` — Boutons du bandeau principal.
+- `recorder_start` / `recorder_stop` / `recorder_replay` — Boutons recorder (certaines logiques surchargées dans `SimulationUI`).
 - `_handle_load_T_or_C` — Hook chargement (implémenté dans `SimulationUI`).
-- `reset` / `read_commands` — *Abstractmethod* : implémentés dans `SimulationUI`.
+- `reset` / `record_replay` / `recorder_read` / `recorder_save` — *Abstractmethod*, implémentés dans `SimulationUI` ; le bouton REPLAY appelle `recorder_replay` (concrete), qui invoque `record_replay`.
 - `show_telemetry_1` / `2` / `3` — Met à jour le texte des trois lignes (arguments déjà formatés côté appelant).
 - `update_camera_position` — Filtre la position caméra pour suivre le kart en douceur.
 - `mainloop` — Délègue à `fenetre.mainloop`.

@@ -1,5 +1,10 @@
-import numpy as np
-import math
+from pathlib import Path
 
-print(list(range(-45, 45, 10)))
-print(float("-10"))
+import numpy 
+import struct
+
+LG2010_XRK = Path(__file__).resolve().parent / "C_et_T" / "C_et_T_files" / "xrk_files" / "LG2010.xrk"
+with open(LG2010_XRK, "rb") as f:
+    chunk = f.read(32)
+
+print(struct.unpack("8f", chunk))  # test floats

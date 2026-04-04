@@ -227,15 +227,17 @@ class User_Interface:
         # width en caractères (police du bouton) : assez large pour « RECORDING » sans élargir le frame
         # Ne pas chaîner .pack() sur l'affectation : pack() retourne None.
         self.btn_record = Button(frame, text="RECORD", fg="green", width=12,
-                                command=self._handle_record)
+                                command=self.recorder_start)
         self.btn_record.pack(padx=10, pady=5, anchor=N)
         Button(frame, text="STOP", fg="blue", width=12,
-                                 command=self._handle_stop).pack(padx=10, pady=5, anchor=CENTER)
+                                 command=self.recorder_stop).pack(padx=10, pady=5, anchor=CENTER)
         self.btn_replay = Button(frame, text="REPLAY", fg="red", width=12,
-                           command=self._handle_replay, state="disabled")
+                           command=self.recorder_replay, state="disabled")
         self.btn_replay.pack(padx=10, pady=5, anchor=CENTER)
+        Button(frame, text="SAVE", fg="black", width=12,
+                                command=self.recorder_save).pack(padx=10, pady=5, anchor=CENTER)
         Button(frame, text="READ", fg="black", width=12,
-                                command=self.read_commands).pack(padx=10, pady=5, anchor=CENTER)
+                                command=self.recorder_read).pack(padx=10, pady=5, anchor=CENTER)
 
     def _create_circuits_frame(self, frame):
         """Crée le frame trajectoire cible, qui peut être un circuit d'ailleurs"""
@@ -340,15 +342,15 @@ class User_Interface:
         """Met en pause la simulation"""
         self.simul_pause = not self.simul_pause
 
-    def _handle_record(self):
-        """Change le status de self.record_status et du bouton RECORD
-           et la classe fille SimulationUI gérera l'enregistrement
+    def recorder_start(self):
+        """Démarre l'enregistrement : ``record_status`` et libellé du bouton RECORD.
+           SimulationUI peut restreindre le démarrage (ex. début de simulation uniquement).
         """
         
         self.record_status = True
         self.btn_record.config(text="RECORDING", state="disabled")
 
-    def _handle_stop(self):
+    def recorder_stop(self):
         """Change le status de self.record_status et du bouton RECORD
         """
         self.record_status = False
@@ -364,8 +366,17 @@ class User_Interface:
         Sera chargé dans la classe SimulationUI"""
         pass
 
-    def _handle_replay(self):
-        """Gère l'action de pause - appelle la méthode surchargée"""
+    @abstractmethod
+    def record_replay(self):
+        """Prépare le mode replay à partir des variables internes déjà remplies (voir ``recorder_read`` ou RECORD).
+
+        ``SimulationUI`` : réinitialise la sim, applique ``cond_t0_recorded`` / snapshot, puis ``animation_step``
+        consomme ``self.controls_recorded`` via le temps simulé.
+        """
+        pass
+
+    def recorder_replay(self):
+        """Bouton REPLAY : rejoue la timeline stockée en mémoire (``record_replay``), puis enlève la pause."""
         self.record_replay()
         self.simul_pause = False
 
@@ -376,8 +387,14 @@ class User_Interface:
         pass
 
     @abstractmethod
-    def read_commands(self):
-        """Lit un fichier de commandes et remplit self.controls_recorded (et éventuels paramètres associés)."""
+    def recorder_read(self):
+        """Charge un fichier de commandes et met à jour les variables internes de replay (``controls_recorded``,
+        ``cond_t0_recorded``, paramètres fichier, ``_replay_t_end``, etc.) sans lancer le replay."""
+        pass
+
+    @abstractmethod
+    def recorder_save(self):
+        """Enregistre l’historique courant (mémoire) dans un fichier choisi au format commandes."""
         pass
     
     def show_telemetry_1(self, pas_simul, temps, t_cyclemax_ms, t_framemax_ms, F_com):
