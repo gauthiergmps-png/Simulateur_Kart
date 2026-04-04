@@ -31,9 +31,14 @@ V.1.2.2: J'ai ajouté un mode "Explore" qui permet de tabuler le comportement du
          et d'enregister un fichier visualisable dans ParaView: points = (cap, volant, gaz) et T=vitesse
          et l'ameliore l'observabilité de l'état du kart en pause, que je peux forcer en vitesse pendant la pause
 V1.2.3: Je supprime le curseur volant qui sert pas, que je remplace par position CdG.
+V1.2.4: Ajout d'une syntaxe de fichier de commande dans les fonctions "recorder"
+
        
 # TODO
 Hèlas toujours commencer par demander d'appliquer les cursorrules...
+refaire marcher le suivi de trajectoire, c'est cassé depuis les modifs recorder
+
+
 
 Faire marcher un replay par defaut de 5 secondes.
 afficher un temps au tour

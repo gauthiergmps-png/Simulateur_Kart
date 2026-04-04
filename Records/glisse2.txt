@@ -1,0 +1,70 @@
+t0_position : [ 145.0091410854891, -89.95285737822975, 0.0]
+t0_vitesse : [ 20.39375704111387, 1.2534597823318777e-14, 0.0]
+t0_lacet : -347.5138991489272
+param_h_cdg: 0.0
+param_ouverture: 0.0
+param_transm : 0
+param_pos_cdg: 0.4
+
+at t=0 gaz = 20.0
+at t=3225 volant = -5.0
+at t=3625 volant = 0.0
+at t=4650 volant = -5.0
+at t=5150 volant = 0.0
+at t=8650 volant = -5.0
+at t=9175 volant = 0.0
+at t=9675 volant = 5.0
+at t=10150 volant = 10.0
+at t=10375 volant = 15.0
+at t=10650 volant = 20.0
+at t=14700 volant = 15.0
+at t=14925 volant = 10.0
+at t=15500 volant = 5.0
+at t=16675 gaz = 0.0
+at t=16675 frein = 1.0
+at t=16800 frein = 2.0
+at t=17000 frein = 3.0
+at t=17175 frein = 4.0
+at t=20975 gaz = 10.0
+at t=20975 frein = 0.0
+at t=21650 gaz = 20.0
+at t=22225 volant = 10.0
+at t=22850 volant = 5.0
+at t=23150 volant = 0.0
+at t=24450 volant = 5.0
+at t=24675 volant = 10.0
+at t=24900 volant = 15.0
+at t=25175 volant = 10.0
+at t=25525 volant = 5.0
+at t=25700 volant = 0.0
+at t=25900 volant = -5.0
+at t=26075 volant = -10.0
+at t=26225 volant = -15.0
+at t=26450 volant = -20.0
+at t=26650 volant = -25.0
+at t=27275 volant = -20.0
+at t=27475 volant = -15.0
+at t=27675 volant = -10.0
+at t=28275 volant = -5.0
+at t=28325 volant = 0.0
+at t=28375 volant = 5.0
+at t=28400 volant = 10.0
+at t=28450 volant = 15.0
+at t=28500 volant = 20.0
+at t=28550 volant = 25.0
+at t=28575 volant = 30.0
+at t=28625 volant = 35.0
+at t=28650 volant = 40.0
+at t=28700 volant = 45.0
+at t=29900 volant = 40.0
+at t=30075 volant = 35.0
+at t=30275 volant = 30.0
+at t=30450 volant = 25.0
+at t=30625 volant = 20.0
+at t=30775 volant = 15.0
+at t=30975 volant = 10.0
+at t=31125 volant = 5.0
+at t=31350 volant = 0.0
+at t=31550 volant = -5.0
+at t=32325 volant = 0.0
+at t=36975 pause

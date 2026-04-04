@@ -29,7 +29,6 @@ def _safe_tk_var_float(var: Any, default: float = 0.0) -> float:
     except (TclError, ValueError, TypeError):
         return float(default)
 
-
 def _parse_bracket_float_list(s: str) -> list:
     s = s.strip()
     if s.startswith("[") and s.endswith("]"):
@@ -42,28 +41,31 @@ def _parse_bracket_float_list(s: str) -> list:
         out.append(float(p))
     return out
 
+def ms_string_to_seconds_float(token: str) -> float:
+    """Valeur après ``t=`` ou ``t+=`` : millisecondes entières → secondes internes."""
+    return int(token.strip(), 10) / 1000.0  # en base 10 donc
 
-def _parse_at_time_token_to_seconds(token: str) -> float:
-    """Valeur après ``t=`` ou ``t+=`` : millisecondes (nombre lu tel quel, converti en secondes internes)."""
-    return float(token.strip()) / 1000.0
-
-
-_AT_TIME_ABS = re.compile(r"^at\s+t\s*=\s*(\d+(?:\.\d*)?|\.\d+)\s+(.+)$", re.IGNORECASE)
-_AT_TIME_REL = re.compile(r"^at\s+t\s*\+=\s*(\d+(?:\.\d*)?|\.\d+)\s+(.+)$", re.IGNORECASE)
+# Motifs pour ``at t=<ms> …`` et ``at t+=<ms> …`` : .match() depuis le début (^…$), espaces souples (\s),
+# groupe 1 = ms entières, groupe 2 = corps de commande ; IGNORECASE autorise AT / T en majuscules.
+_AT_TIME_ABS = re.compile(r"^at\s+t\s*=\s*(\d+)\s+(.+)$", re.IGNORECASE)
+_AT_TIME_REL = re.compile(r"^at\s+t\s*\+=\s*(\d+)\s+(.+)$", re.IGNORECASE)
 
 _INNER_PAUSE_RE = re.compile(r"^pause\s*$", re.IGNORECASE)
 _INNER_REGUL_RE = re.compile(r"^regul_(on|off)\s*$", re.IGNORECASE)
-_INNER_CMD_RE = re.compile(
-    r"^(\w+)\s*(\+=|-=|=)\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))\s*$",
-    re.IGNORECASE,
-)
-
+_INNER_CMD_RE = re.compile(r"^(\w+)\s*(\+=|-=|=)\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+))\s*$",re.IGNORECASE)
 
 def _parse_commandes_txt_init_and_events(text: str) -> Tuple[dict, list]:
-    """Parse Records/commandes.txt (syntaxe README_commandes.md). Retourne (init_dict, events).
-
-    Chaque ligne est d'abord tronquée avant le premier ``#``, puis stripée.
-    Pour ``at t=`` / ``at t+=`` : la valeur est toujours en millisecondes.
+    """Parse le fichier de commandes .txt (syntaxe README_commandes.md). 
+    
+    Retourne:
+       - init: dictionnaire des conditions initiales et de leurs valeurs
+       - events: liste d'événements triés par temps croissant 
+            chaque événement est un dictionnaire contenant:
+            - t: temps de l'événement en secondes
+            - cmd: commande de l'événement
+            - val: valeur de la commande
+            - abs: True si la valeur est absolue, False si la valeur est relative
+            - ord: indice de la ligne dans le fichier de commandes (supprimé après le tri)
     """
     init: dict = {}
     events = []
@@ -71,31 +73,34 @@ def _parse_commandes_txt_init_and_events(text: str) -> Tuple[dict, list]:
     last_resolved_t = 0.0
     for raw in text.splitlines():
         line_ord += 1
+        # suppression des commentaires en fin de ligne
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         if line.lower().lstrip().startswith("at "):
+            # commande de type "at t = commande" ou "at t += commande"
+
+            # extraction de la valeur de t dans t_evt et de la commande dans body
             m_abs = _AT_TIME_ABS.match(line)
             m_rel = _AT_TIME_REL.match(line)
             if m_abs:
-                t_evt = _parse_at_time_token_to_seconds(m_abs.group(1))
+                t_evt = ms_string_to_seconds_float(m_abs.group(1))
                 body = m_abs.group(2).strip()
             elif m_rel:
-                t_evt = last_resolved_t + _parse_at_time_token_to_seconds(m_rel.group(1))
+                t_evt = last_resolved_t + ms_string_to_seconds_float(m_rel.group(1))
                 body = m_rel.group(2).strip()
             else:
                 print(f"Ligne 'at' non reconnue (ligne {line_ord}): {line.strip()}")
                 continue
             last_resolved_t = t_evt
 
+            # extraction des commandes sans valeurs (pause, regul_on, regul_off)
             if _INNER_PAUSE_RE.match(body):
                 events.append({"t": t_evt, "ord": line_ord, "cmd": "pause"})
                 continue
             ir = _INNER_REGUL_RE.match(body)
             if ir:
-                events.append(
-                    {"t": t_evt, "ord": line_ord, "cmd": f"regul_{ir.group(1).lower()}"}
-                )
+                events.append({"t": t_evt, "ord": line_ord, "cmd": f"regul_{ir.group(1).lower()}"})
                 continue
             ic = _INNER_CMD_RE.match(body)
             if not ic:
@@ -107,16 +112,26 @@ def _parse_commandes_txt_init_and_events(text: str) -> Tuple[dict, list]:
             if name not in ("volant", "gaz", "frein"):
                 print(f"Commande inconnue '{name}' (ligne {line_ord}), ignorée.")
                 continue
-            events.append(
-                {
+
+            # construction de l'événement avec les informations extraites
+            events.append({
                     "t": t_evt,
                     "ord": line_ord,
                     "cmd": name,
-                    "abs": op == "=",
+                    "abs": op == "=",    # True valeur absolue, False si valeur relative
                     "val": val if op == "=" else (val if op == "+=" else -val),
-                }
-            )
+                } )
             continue
+
+        # extraction des conditions initiales, de la forme:
+        # t0_position: [x, y, z]
+        # t0_vitesse: [vx, vy, vz]
+        # t0_lacet: lacet en degrés
+        # param_h_cdg: 
+        # param_ouverture: ouverture des suspensions en degrés
+        # param_transm: t
+        # param_pos_cdg: 0.4
+
         if ":" not in line:
             print(f"Ligne ignorée (ligne {line_ord}): {line.strip()}")
             continue
@@ -140,11 +155,14 @@ def _parse_commandes_txt_init_and_events(text: str) -> Tuple[dict, list]:
         else:
             print(f"Clé d'initialisation inconnue '{key}' (ligne {line_ord}), ignorée.")
 
+    # tri des événements par temps croissant
     events.sort(key=lambda e: (e["t"], e["ord"]))
+
+    # suppression de l'indice de ligne pour ne pas polluer l'affichage
     for e in events:
         e.pop("ord", None)
-    return init, events
 
+    return init, events
 
 def _commandes_init_to_cond_t0(init: dict) -> dict:
     """Construit conditions_t0 pour Kart.init_state à partir du bloc d'init du fichier texte."""
@@ -157,7 +175,6 @@ def _commandes_init_to_cond_t0(init: dict) -> dict:
         lacet_rad = float(init["t0_lacet"]) * np.pi / 180.0
         p["angles"] = np.array([lacet_rad, 0.0, 0.0])
     return p
-
 
 class SimulationCore:
     """Cœur d'une simulation dynamique du Kart, sans UI.
@@ -358,7 +375,7 @@ class SimulationUI(User_Interface):
         self.controls_recorded = []
         self._replay_next_event_idx = 0
         self._replay_t_end = None
-        self._record_snapshot = None
+        self.t0_conditions_recorded = None
         self._cmd_init_params_from_file = {}
         self._replay_use_snapshot_params = False
         self.reset()
@@ -740,7 +757,6 @@ class SimulationUI(User_Interface):
                            fill='', width=15, style="arc")
         self.cnv.create_text(233, 80, text=str(int(V)), font="Arial 18", fill="white")
 
-    
     def _trace_volant(self):
         """Dessine le volant"""
         self.cnv.create_arc((100, 40), (170, 110), outline="grey", extent=359.9, start=0,
@@ -751,7 +767,9 @@ class SimulationUI(User_Interface):
         self.cnv.create_text(133, 75, text=str(int(self.volant)), font="Arial 18", fill="white")
 
     def recorder_start(self):
-        """Démarre l'enregistrement (surcharge : uniquement si ``pas_simul == 0``).
+        """Démarre l'enregistrement d'une simulation manuelle
+        
+        Ne peut démarrer que juste après un reset (pas de simul = 0)
         """
         if self.core.pas_simul == 0:        
             self.record_status = True
@@ -762,7 +780,7 @@ class SimulationUI(User_Interface):
             self.cond_t0_recorded = None
             self._cmd_init_params_from_file = {}
             self._replay_use_snapshot_params = True
-            self._record_snapshot = {
+            self.t0_conditions_recorded = {
                 "t0_position": [float(self.kart.position[i]) for i in range(3)],
                 "t0_vitesse": [float(self.kart.vitesse[i]) for i in range(3)],
                 "t0_lacet": float(self.kart.angles[0] * 180.0 / np.pi),
@@ -774,16 +792,21 @@ class SimulationUI(User_Interface):
             self.btn_record.config(text="RECORDING", state="disabled")
  
     def recorder_stop(self):
-        """Arrête l'enregistrement ; active REPLAY si la mémoire contient au moins un pas."""
+        """Arrête l'enregistrement ; coupe un replay en cours (``replay_status``) et passe en pause si besoin ;
+        active REPLAY si la mémoire contient au moins un pas."""
+        exiting_replay = self.replay_status
         super().recorder_stop()
+        # self.replay_status = False
+        if exiting_replay:
+            self.simul_pause = True
         if len(self.controls_recorded) > 0:
             self.btn_replay.config(state="normal")
         else:
             self.btn_replay.config(state="disabled")
 
     def recorder_read(self):
-        """Charge la timeline et l'état initial depuis un fichier texte (dialogue).
-
+        """Charge la timeline et l'état initial depuis un fichier de commandes .txt (syntaxe README_commandes.md)
+        
         Remplit ou met à jour :
 
         ``controls_recorded`` (list[dict])
@@ -819,6 +842,7 @@ class SimulationUI(User_Interface):
         au kart affiché (hors lancement du replay). Le déplacement selon le fichier n'a lieu qu'après
         ``recorder_replay`` / ``record_replay`` (reset + rejouer la timeline).
         """
+        # demande à l'utilisateur le nom du fichier de commandes à charger
         RECORDS_DIR.mkdir(parents=True, exist_ok=True)
         path_str = filedialog.askopenfilename(
             parent=self.fenetre,
@@ -831,6 +855,8 @@ class SimulationUI(User_Interface):
         if not path_str:
             return
         path_cmd = Path(path_str)
+
+        # lecture du fichier de commandes
         try:
             text = path_cmd.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -974,33 +1000,39 @@ class SimulationUI(User_Interface):
             f"({n_samples} échantillons → {n_chg_lines} lignes de changement + pause finale, T_fin_ms={int(round(float(max_t) * 1000))})."
         )
 
-    def _apply_replay_event(self, e: dict) -> None:
-        if e.get("cmd") == "pause":
+    def _apply_replay_event(self, event: dict) -> None:
+        """ A partir d'un événement issu d'un fichier de commandes, applique les commandes au kart
+           Arguments:
+           - event: événement issu d'un fichier de commandes
+           Sortie:
+            Affecte les variables self.gaz, self.volant, self.frein 
+        """
+        if event.get("cmd") == "pause":
             self.simul_pause = True
             return
-        if e.get("cmd") == "regul_on":
+        if event.get("cmd") == "regul_on":
             self.regul.set(1)
             return
-        if e.get("cmd") == "regul_off":
+        if event.get("cmd") == "regul_off":
             self.regul.set(0)
             return
-        if "volant" in e and "gaz" in e and "frein" in e and "cmd" not in e:
-            self.volant = float(np.clip(float(e["volant"]), -45.0, 45.0))
-            self.gaz = float(np.clip(float(e["gaz"]), 0.0, 80.0))
-            self.frein = float(np.clip(float(e["frein"]), 0.0, 4.0))
+        if "volant" in event and "gaz" in event and "frein" in event and "cmd" not in event:
+            self.volant = float(np.clip(float(event["volant"]), -45.0, 45.0))
+            self.gaz = float(np.clip(float(event["gaz"]), 0.0, 80.0))
+            self.frein = float(np.clip(float(event["frein"]), 0.0, 4.0))
             return
-        cmd = e.get("cmd")
+        cmd = event.get("cmd")
         if cmd not in ("volant", "gaz", "frein"):
             return
-        if e.get("abs"):
+        if event.get("abs"):
             if cmd == "volant":
-                self.volant = float(e["val"])
+                self.volant = float(event["val"])
             elif cmd == "gaz":
-                self.gaz = float(e["val"])
+                self.gaz = float(event["val"])
             else:
-                self.frein = float(e["val"])
+                self.frein = float(event["val"])
         else:
-            delta = float(e["val"])
+            delta = float(event["val"])
             if cmd == "volant":
                 self.volant += delta
             elif cmd == "gaz":
@@ -1012,18 +1044,23 @@ class SimulationUI(User_Interface):
         self.frein = float(np.clip(self.frein, 0.0, 4.0))
 
     def _apply_replay_events_up_to(self, t_now: float) -> None:
+        """ Applique au kart les commmandes issues du fichier de commandes pas encore executées
+        jusqu'à la date t_now
+        """
         if not self.replay_status:
             return
         eps = 1e-9
         while self._replay_next_event_idx < len(self.controls_recorded):
-            ev = self.controls_recorded[self._replay_next_event_idx]
-            if ev["t"] > t_now + eps:
+            event = self.controls_recorded[self._replay_next_event_idx]
+            if event["t"] > t_now + eps:
                 break
-            self._apply_replay_event(ev)
+            self._apply_replay_event(event)
             self._replay_next_event_idx += 1
 
     def record_replay(self):
-        """Active le replay à partir des variables internes (``controls_recorded``, ``cond_t0_recorded``, …) : reset,
+        """Activée par le bouton REPLAY de l'interface utilisateur, 
+        cette fonction lance le replay de la simulation à partir des variables internes 
+        (``controls_recorded``, ``cond_t0_recorded``, …) : reset,
         état initial kart, puis ``animation_step`` applique les événements selon ``core.temps``."""
         self.record_status = False
         # Si aucune commande n'est chargée, on ne lance pas de replay
@@ -1033,7 +1070,6 @@ class SimulationUI(User_Interface):
 
         # On indique qu'on est en mode replay avant le reset pour ne pas vider controls_recorded
         self.replay_status = True
-
         self.reset()
 
         self._replay_next_event_idx = 0
@@ -1046,7 +1082,7 @@ class SimulationUI(User_Interface):
             and getattr(self, "_replay_use_snapshot_params", False)
             and getattr(self, "_record_snapshot", None)
         ):
-            snap = self._record_snapshot
+            snap = self.t0_conditions_recorded
             p = {
                 "position": np.array(snap["t0_position"], dtype=float),
                 "vitesse": np.array(snap["t0_vitesse"], dtype=float),
@@ -1069,7 +1105,7 @@ class SimulationUI(User_Interface):
                 pos_cdg=float(fpar["param_pos_cdg"]) if "param_pos_cdg" in fpar else self.kart.pos_cdg,
             )
         elif getattr(self, "_replay_use_snapshot_params", False) and getattr(self, "_record_snapshot", None):
-            snap = self._record_snapshot
+            snap = self.t0_conditions_recorded
             self.kart.init_parametres(
                 h_cdg=float(snap["param_h_cdg"]),
                 ouverture=float(snap["param_ouverture"]),
@@ -1444,7 +1480,7 @@ class SimulationUI(User_Interface):
         t0_frame = time.time()  
         t_frame=0.
 
-        if self.replay_status and self._replay_t_end is not None and self.core.temps > self._replay_t_end + 1e-9:
+        if self.replay_status and self._replay_t_end is not None and self.core.temps > self._replay_t_end -0.1:
             self.replay_status = False
             self.simul_pause = True
 

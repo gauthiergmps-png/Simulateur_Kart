@@ -18,7 +18,7 @@ Ce document présente les commandes que le programme saura lire dans un fichier.
 
 Chaque ligne commence par ``at ``, puis le **temps**, puis la commande.
 
-**Temps (après ``t=`` ou ``t+=``) :** toujours en **millisecondes**. Ex. ``at t=1500`` = 1,5 s après le début du replay ; ``at t+=250`` ajoute 250 ms à l’instant résolu de la ligne précédente (ordre du fichier). La première ligne peut utiliser ``t+=`` : la référence initiale est 0 ms. Un nombre décimal (ex. ``1500.5``) représente des millisecondes avec une fraction.
+**Temps (après ``t=`` ou ``t+=``) :** **entier** en **millisecondes** uniquement (pas de partie décimale). Ex. ``at t=1500`` = 1,5 s après le début du replay ; ``at t+=250`` ajoute 250 ms à l’instant résolu de la ligne précédente (ordre du fichier). La première ligne peut utiliser ``t+=`` : la référence initiale est 0 ms.
 
 **Commandes** (après le temps). La valeur du volant / gaz / frein est en **absolu** avec ``=``, ou en **variation** avec ``+=`` / ``-=`` :
 

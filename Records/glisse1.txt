@@ -1,0 +1,13 @@
+t0_position : [ 0.0, 0.0, 0.0]
+t0_vitesse : [ 0.0, 0.0, 0.0]
+t0_lacet : 0.0
+param_h_cdg: 0.0
+param_ouverture: 0.0
+param_transm : 0
+param_pos_cdg: 0.4
+
+at t=0 gaz = 20.0
+at t=8275 volant = -5.0
+at t+=1000 volant += 20.0
+at t=20000 frein=4
+at t=22000 pause

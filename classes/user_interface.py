@@ -248,6 +248,7 @@ class User_Interface:
 
         Button(frame, text="CLEAR", fg="blue", width=12, 
                            command=self._handle_clear_T_or_C).pack(padx=10, pady=5, anchor=CENTER)
+    
     def _create_balancing_frame(self, frame):
         """Crée le frame de contrôle de position et hauteur CdG, 
          """
@@ -405,7 +406,12 @@ class User_Interface:
         """
         # Télémesure 1 (affichage direct des arguments formatés)
         text1="SIMULATION -   PAUSE  - " if self.simul_pause else "SIMULATION - RUNNING  -"
-        text2=" RECORDER - OFF -" if not self.record_status else " RECORDER -  ON - "
+        if self.record_status:
+            text2 = " RECORDER -  ON    - "
+        elif self.replay_status:
+            text2 = " RECORDER - REPLAY - "
+        else:
+            text2 = " RECORDER -  OFF   -"
         texteaff = (text1+
             f"N= {pas_simul:10}  T = {temps:6.2f}  "
             f"Tcyclemax = {t_cyclemax_ms:3d} ms Tframemax = {t_framemax_ms:3d} ms "+
